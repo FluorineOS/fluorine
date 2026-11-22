@@ -1,4 +1,4 @@
-# AGENTS.md — FluorineOS Engineering Standards
+# AGENTS.md - FluorineOS Engineering Standards
 
 This repository is the primary build monorepo for **FluorineOS**. The rules below are
 non-negotiable for every OpenCode session, agent, and contributor. If a request conflicts
@@ -16,6 +16,12 @@ Before making any architectural, packaging, styling, or release change, read:
 - `SOURCE_OF_TRUTH/RELEASE_INSTRUCTIONS.md`
 - `SOURCE_OF_TRUTH/DESIGN_SYSTEM.md`
 - `SOURCE_OF_TRUTH/ARCHITECTURE_GOTCHAS.md`
+- `SOURCE_OF_TRUTH/README_INSTRUCTIONS.md`
+
+Every OpenCode session must read and obey `SOURCE_OF_TRUTH/README_INSTRUCTIONS.md` before
+creating or modifying any `README.md` in any FluorineOS repository. The public README is a
+contract with end users: internal state, roadmap prompts, build notes, and
+`SOURCE_OF_TRUTH/` references must never appear in it.
 
 Also check `SOURCE_OF_TRUTH/BUILD_STATUS.md` for current milestone progress.
 
@@ -254,7 +260,35 @@ command and its consequences.
 Read-only inspection commands such as `git status`, `apt-cache policy`, `lb config --help`,
 and `shellcheck` are allowed without confirmation.
 
-## 7. OpenCode workflow
+## 7. Mandatory tool availability
+
+Never skip a command, linter, validator, package check, or GitHub CLI operation because a
+tool is not installed. Install the required Debian package immediately, then execute the
+step in the same session.
+
+| Step | Required tool | Debian package |
+| --- | --- | --- |
+| Shell linting | `shellcheck` | `shellcheck` |
+| JSON validation | `jq` | `jq` |
+| SVG rendering | `rsvg-convert` | `librsvg2-bin` |
+| Package checks | `apt-cache` | `apt` |
+| GitHub operations | `gh` | `gh` |
+| Debian packaging | `dpkg-buildpackage`, `dh` | `dpkg-dev`, `debhelper` |
+| APT archive | `reprepro` | `reprepro` |
+| ISO assembly | `lb`, `xorriso`, `mksquashfs` | `live-build`, `xorriso`, `squashfs-tools` |
+| VM verification | `qemu-system-x86_64` | `qemu-system-x86` |
+
+- Install missing tools with `sudo apt-get update && sudo apt-get install -y <package>`
+  before running the step, then run the step.
+- State the tool and version that produced each verification result, for example
+  `shellcheck 0.10.0`.
+- A substitute tool, a manual inspection, or an unchecked assumption is not an acceptable
+  replacement for the required tool. If the host genuinely cannot run it, stop and ask the
+  maintainer instead of silently downgrading the check.
+- Run `gh auth status` before any GitHub operation. If the CLI is not authenticated, pause
+  and ask the maintainer to run `gh auth login`.
+
+## 8. OpenCode workflow
 
 - Repository commands:
   - `/new-hook` scaffolds a new chroot hook, makes it executable, and runs `shellcheck`.
@@ -264,7 +298,7 @@ and `shellcheck` are allowed without confirmation.
   `live-build` operations behind an explicit prompt. Do not weaken those permissions.
 - This `AGENTS.md` is authoritative. Update it only when the maintainer changes a standard.
 
-## 8. Definition of done
+## 9. Definition of done
 
 Before considering a change complete:
 
@@ -276,5 +310,7 @@ Before considering a change complete:
 - [ ] Every script and hook has the required shebang and strict mode, is executable, and
       passes `shellcheck` with zero warnings.
 - [ ] Every package has been verified against `trixie` or `trixie-backports`.
+- [ ] Every public `README.md` follows `SOURCE_OF_TRUTH/README_INSTRUCTIONS.md`.
+- [ ] Every verification step ran with the required tool installed and reported its version.
 - [ ] No generated build artifacts or secrets are staged.
 - [ ] The change has been reviewed for destructive commands and follows the safety rule.

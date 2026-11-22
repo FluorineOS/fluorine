@@ -33,6 +33,21 @@
     },
     {
       "action": "shell",
+      "resource": "sudo apt-get update",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "sudo apt-get install *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "sudo apt install *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
       "resource": "dpkg-buildpackage *",
       "effect": "allow"
     },
