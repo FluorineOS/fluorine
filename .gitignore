@@ -1,3 +1,7 @@
+# Local-only canonical reference; never commit this directory
+SOURCE_OF_TRUTH/
+SOURCE OF TRUTH/
+
 # live-build build tree
 /binary/
 /cache/

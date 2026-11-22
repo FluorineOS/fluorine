@@ -4,6 +4,27 @@ This repository is the primary build monorepo for **FluorineOS**. The rules belo
 non-negotiable for every OpenCode session, agent, and contributor. If a request conflicts
 with them, stop and ask the maintainer before making changes.
 
+## Local canonical reference (read first)
+
+`SOURCE_OF_TRUTH/` is a local-only, gitignored directory at the repository root. It is the
+canonical internal reference for all OpenCode sessions across the FluorineOS project. Never
+add, stage, or commit anything inside it.
+
+Before making any architectural, packaging, styling, or release change, read:
+
+- `SOURCE_OF_TRUTH/PROJECT_CONTEXT.md`
+- `SOURCE_OF_TRUTH/RELEASE_INSTRUCTIONS.md`
+- `SOURCE_OF_TRUTH/DESIGN_SYSTEM.md`
+- `SOURCE_OF_TRUTH/ARCHITECTURE_GOTCHAS.md`
+
+Also check `SOURCE_OF_TRUTH/BUILD_STATUS.md` for current milestone progress.
+
+The zero-emoji mandate and semantic versioning rules in
+`SOURCE_OF_TRUTH/RELEASE_INSTRUCTIONS.md` are mandatory for every session and every
+repository in the FluorineOS organization. Use plain ASCII text and standard Markdown. Do
+not add emojis to commit messages, tags, changelogs, README files, release notes, CLI
+output, comments, or documentation.
+
 ## 1. OS identity and release
 
 | Property | Required value |
