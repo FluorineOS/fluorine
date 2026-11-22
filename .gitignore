@@ -28,6 +28,8 @@ SOURCE OF TRUTH/
 *.changes
 *.buildinfo
 *.qcow2
+/test-vars.fd
+/test-disk.qcow2
 
 # OS / editor noise
 .DS_Store
