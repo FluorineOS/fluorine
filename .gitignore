@@ -1,0 +1,27 @@
+# live-build build tree
+/binary/
+/cache/
+/chroot/
+/.build/
+
+# live-build generated configuration state
+/config/binary/
+/config/bootstrap/
+/config/chroot/
+/config/common/
+/config/source/
+
+# live-build logs
+/auto/build.log
+*.log
+
+# Image and package artifacts
+*.iso
+*.iso.sha256
+*.deb
+*.changes
+*.buildinfo
+*.qcow2
+
+# OS / editor noise
+.DS_Store

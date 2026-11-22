@@ -1,0 +1,95 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permissions": [
+    {
+      "action": "external_directory",
+      "resource": "*",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "git *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "gh *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "shellcheck *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "apt-cache *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "dpkg-buildpackage *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "dpkg-deb *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "reprepro *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "gpg *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "mkdir *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "chmod *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "cp *",
+      "effect": "allow"
+    },
+    {
+      "action": "shell",
+      "resource": "sudo lb *",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "sudo ./auto/build*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "sudo ./auto/clean*",
+      "effect": "ask"
+    },
+    {
+      "action": "shell",
+      "resource": "rm -rf /*",
+      "effect": "deny"
+    },
+    {
+      "action": "shell",
+      "resource": "sudo rm -rf /*",
+      "effect": "deny"
+    }
+  ]
+}
