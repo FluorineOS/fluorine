@@ -39,10 +39,16 @@ Also check `SOURCE_OF_TRUTH/BUILD_STATUS.md` for current milestone progress.
   complete. For changes to multiple repositories, create a separate commit in each
   repository. Never combine sibling repositories in one commit or include unrelated
   pre-existing changes.
+- Immediately push every new commit to that repository's configured `origin` branch.
+  Do not leave a completed task's commit only in a local worktree; if a push fails,
+  report the error and the unpushed commit.
+- Never build or publish a FluorineOS ISO, create or push a release tag, or otherwise
+  initiate a release unless the user explicitly authorizes that release action. This
+  approval is separate from permission to make and push ordinary commits.
 - Keep local-only `SOURCE_OF_TRUTH/` files, secrets, credentials, and ignored/generated
   build output out of commits. Do not force-add them to satisfy the commit requirement.
-- Follow `SOURCE_OF_TRUTH/RELEASE_INSTRUCTIONS.md` for commit format and push commits to
-  `origin` when requested or required by the release workflow.
+- Follow `SOURCE_OF_TRUTH/RELEASE_INSTRUCTIONS.md` for commit format, push every commit
+  to `origin`, and follow its release-approval gate.
 
 The zero-emoji mandate and semantic versioning rules in
 `SOURCE_OF_TRUTH/RELEASE_INSTRUCTIONS.md` are mandatory for every session and every
