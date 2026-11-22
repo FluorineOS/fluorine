@@ -34,13 +34,11 @@ Also check `SOURCE_OF_TRUTH/BUILD_STATUS.md` for current milestone progress.
 - Resolve the owning Git root before editing or committing. Each project repository
   has its own GitHub remote under `https://github.com/FluorineOS`; the organization
   profile repository is rooted at `.github`, with its page content in `.github/profile`.
-- Commit every intentional, commit-eligible project change, including file additions,
-  modifications, and deletions, in its owning repository before reporting the task
-  complete. For changes to multiple repositories, create a separate commit in each
-  repository. Never combine sibling repositories in one commit or include unrelated
-  pre-existing changes.
-- Immediately push every new commit to that repository's configured `origin` branch.
-  Do not leave a completed task's commit only in a local worktree; if a push fails,
+- Commit and push every individual intentional, commit-eligible change, however small,
+  to the owning repository's configured `origin` branch as soon as that change is made.
+  Do not defer changes or bundle separate changes into a later commit. Each change gets
+  its own commit; never combine sibling repositories in one commit or include unrelated
+  pre-existing changes. Do not leave any completed change unpushed. If a push fails,
   report the error and the unpushed commit.
 - Never build or publish a FluorineOS ISO, create or push a release tag, or otherwise
   initiate a release unless the user explicitly authorizes that release action. This
