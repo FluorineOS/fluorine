@@ -23,6 +23,8 @@ SOURCE OF TRUTH/
 *.iso
 *.iso.sha256
 *.deb
+# Local package pool consumed by live-build; must be committed
+!config/packages.chroot/*.deb
 *.changes
 *.buildinfo
 *.qcow2

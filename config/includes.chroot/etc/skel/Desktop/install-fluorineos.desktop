@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Install FluorineOS 0.0.1
+Comment=Install FluorineOS on this computer
+Exec=sudo -E env QT_QPA_PLATFORM=xcb calamares
+Icon=calamares
+Terminal=false
+Categories=System;
+StartupNotify=true

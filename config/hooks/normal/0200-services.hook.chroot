@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Hook: 0200-services
+# Runs inside the live-build chroot as root during the normal hook phase.
+# Enables the systemd units FluorineOS expects and applies the ufw policy.
+
+enable_unit() {
+    local unit="$1"
+
+    if systemctl enable "${unit}" >/dev/null 2>&1; then
+        printf 'Enabled %s\n' "${unit}"
+    else
+        printf 'Skipped %s: unit not available in this chroot\n' "${unit}" >&2
+    fi
+}
+
+main() {
+    enable_unit NetworkManager.service
+    enable_unit bluetooth.service
+    enable_unit greetd.service
+    enable_unit ufw.service
+
+    if command -v ufw >/dev/null 2>&1; then
+        ufw default deny incoming
+        ufw default allow outgoing
+        # Enabling inside the chroot only records the policy; the service
+        # starts on first boot.
+        ufw --force enable || printf 'ufw: enable deferred to first boot\n' >&2
+    else
+        printf 'ufw is not installed, skipping firewall policy\n' >&2
+    fi
+}
+
+main "$@"

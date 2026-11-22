@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Hook: 0400-live-calamares-polkit
+# Runs inside the live-build chroot as root during the normal hook phase.
+# Grants the live session passwordless access to the installer. The Calamares
+# shellprocess module removes this file from the installed system.
+
+SUDOERS_FILE=/etc/sudoers.d/99-fluorine-live-installer
+
+main() {
+    install -d -m 0750 /etc/sudoers.d
+
+    cat > "${SUDOERS_FILE}" <<'EOF'
+# FluorineOS live session only: passwordless Calamares launch.
+# Removed from the installed system by the Calamares shellprocess module.
+%sudo ALL=(ALL) NOPASSWD: /usr/bin/calamares, /usr/bin/env
+EOF
+    chmod 0440 "${SUDOERS_FILE}"
+
+    if command -v visudo >/dev/null 2>&1; then
+        visudo -cf "${SUDOERS_FILE}"
+    else
+        printf 'visudo not available, skipping syntax check\n' >&2
+    fi
+}
+
+main "$@"

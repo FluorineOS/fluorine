@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Hook: 0300-zram
+# Runs inside the live-build chroot as root during the normal hook phase.
+# zram-tools reads /etc/default/zramswap at boot.
+
+main() {
+    cat > /etc/default/zramswap <<'EOF'
+# FluorineOS zramswap defaults
+ALGO=zstd
+PERCENT=50
+EOF
+    chmod 0644 /etc/default/zramswap
+}
+
+main "$@"

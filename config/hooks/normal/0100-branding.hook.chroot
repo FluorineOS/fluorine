@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Hook: 0100-branding
+# Runs inside the live-build chroot as root during the normal hook phase.
+# Owns the distribution identity files and the default hostname.
+
+main() {
+    cat > /etc/os-release <<'EOF'
+PRETTY_NAME="FluorineOS 0.0.1 (Trixie)"
+NAME="FluorineOS"
+VERSION="0.0.1"
+VERSION_ID="0.0.1"
+ID=fluorineos
+ID_LIKE=debian
+HOME_URL="https://github.com/FluorineOS"
+SUPPORT_URL="https://github.com/FluorineOS/fluorine/issues"
+BUG_REPORT_URL="https://github.com/FluorineOS/fluorine/issues"
+EOF
+    chmod 0644 /etc/os-release
+
+    printf '%s\n' 'FluorineOS 0.0.1 \n \l' > /etc/issue
+    chmod 0644 /etc/issue
+
+    printf '%s\n' 'fluorine' > /etc/hostname
+    chmod 0644 /etc/hostname
+
+    if command -v plymouth-set-default-theme >/dev/null 2>&1 &&
+        [ -d /usr/share/plymouth/themes/fluorineos ]; then
+        plymouth-set-default-theme -R fluorineos
+    else
+        printf 'Plymouth theme fluorineos not available, skipping\n' >&2
+    fi
+}
+
+main "$@"
