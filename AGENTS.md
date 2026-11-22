@@ -157,11 +157,14 @@ rewrite it before committing.
 Display managers based on `greetd`/`tuigreet` **must** execute `start-hyprland`, not
 `Hyprland` directly. For example:
 
+`_greetd` is the account the Debian `greetd` package creates; there is no `greeter` user on
+Debian 13.
+
 ```toml
 # /etc/greetd/config.toml
 [default_session]
 command = "tuigreet --time --cmd start-hyprland"
-user = "greeter"
+user = "_greetd"
 ```
 
 Any Wayland session desktop file must also launch the wrapper:
