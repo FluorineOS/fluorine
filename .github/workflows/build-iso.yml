@@ -1,0 +1,121 @@
+name: Build ISO
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-iso-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-iso:
+    name: Build FluorineOS ISO
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    container:
+      image: debian:trixie
+      options: --privileged
+    steps:
+      - name: Check out the live-build tree
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates \
+            curl \
+            git \
+            isolinux \
+            live-build \
+            squashfs-tools \
+            syslinux-efi \
+            xorriso
+          lb --version
+
+      - name: Restore the live-build bootstrap cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            cache/packages.bootstrap
+            cache/stages_bootstrap
+          key: live-build-${{ runner.os }}-${{ hashFiles('auto/config', 'config/archives/**', 'config/package-lists/**') }}
+          restore-keys: |
+            live-build-${{ runner.os }}-
+
+      - name: Configure live-build
+        run: ./auto/config
+
+      - name: Build the ISO
+        run: ./auto/build
+
+      - name: Normalize the ISO name and write the checksum
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${REF_NAME#v}"
+          iso="FluorineOS-${version}-amd64.iso"
+
+          source=""
+          for candidate in FluorineOS-*-amd64.iso; do
+            if [ -f "$candidate" ]; then
+              source="$candidate"
+              break
+            fi
+          done
+          if [ -z "$source" ]; then
+            echo "No FluorineOS ISO was produced by live-build." >&2
+            exit 1
+          fi
+
+          if [ "$source" != "$iso" ]; then
+            mv -- "$source" "$iso"
+          fi
+
+          sha256sum "$iso" > "$iso.sha256"
+          ls -l -- "$iso" "$iso.sha256"
+
+      - name: Upload the ISO as a workflow artifact
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: FluorineOS-${{ github.ref_name }}-amd64
+          path: |
+            FluorineOS-*-amd64.iso
+            FluorineOS-*-amd64.iso.sha256
+          if-no-files-found: error
+
+      - name: Publish the GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: FluorineOS ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          body: |
+            FluorineOS ${{ github.ref_name }} (amd64)
+
+            Live image built from the Debian 13 (trixie) live-build tree, with the
+            Hyprland session, Calamares installer, and the fluorine-desktop,
+            fluorine-artwork, and fluorine-keyring packages.
+
+            Verify the download before writing it to media:
+
+                sha256sum -c FluorineOS-${{ github.ref_name }}.sha256
+
+            The checksum file assumes the ISO keeps the name it has in this release.
+            A UEFI system booting the image needs Secure Boot disabled, or the
+            "Safe Graphics" menu entry when the GPU cannot provide a hardware
+            accelerated renderer.
+          files: |
+            FluorineOS-*.iso
+            FluorineOS-*.iso.sha256
