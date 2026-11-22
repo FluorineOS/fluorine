@@ -2,6 +2,8 @@ calamares
 calamares-settings-debian
 libxcb-cursor0
 python3-toml
+grub-efi-amd64
+efibootmgr
 live-boot
 live-config
 live-config-systemd
