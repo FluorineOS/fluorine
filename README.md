@@ -7,7 +7,7 @@ Wayland compositor. The interface uses a pure AMOLED black canvas (`#000000`) wi
 reactive lime accent (`#B4F03A`) and hairline borders (`#1C2229`). Compositor configuration
 is native Hyprland 0.55 Lua, and installation is handled offline by Calamares.
 
-[Website][website] | [Latest Release][releases] | [APT Repository][apt] | [Issues][issues]
+[Website](https://fluorineos.pages.dev) | [Latest Release (0.0.1)](https://github.com/FluorineOS/fluorine/releases/latest) | [APT Repository](https://fluorineos.github.io/apt-repo) | [Issue Tracker](https://github.com/FluorineOS/fluorine/issues)
 
 ## Download and Verify
 
@@ -20,12 +20,16 @@ releases.
 | Image file | `FluorineOS-0.0.1-amd64.iso` |
 | Checksum file | `FluorineOS-0.0.1-amd64.iso.sha256` |
 | Release page | [FluorineOS Releases][releases] |
+| Image size | `1375442944` bytes (1.28 GiB) |
+| SHA-256 | `17716220f311141ad5ad05eb50bfcb54806f05d81bcccb26ba3a02d9f1234e0a` |
 
 Download both the image and the checksum file, then verify cryptographic integrity:
 
 ```sh
 sha256sum -c FluorineOS-0.0.1-amd64.iso.sha256
 ```
+
+The command prints `OK` when the image matches the digest above.
 
 ## Architecture
 
@@ -135,7 +139,7 @@ qemu-system-x86_64 \
 | [`fluorine-artwork`][artwork] | AMOLED wallpapers, Plymouth splash, branding assets | Debian package |
 | [`fluorine-keyring`][keyring] | Signing keyring and APT sources configuration | Debian package |
 | [`apt-repo`][apt] | Signed static reprepro package archive | APT source |
-| [`fluorine-website`][website] | Official web portal and documentation interface | Web application |
+| [`fluorine-website`][websiterepo] | Official web portal and documentation interface | Web application |
 
 ## Building from Source
 
@@ -160,7 +164,8 @@ sudo lb build
 
 FluorineOS is open-source software distributed under the GNU General Public License v3.
 
-[website]: https://github.com/FluorineOS/fluorine-website
+[website]: https://fluorineos.pages.dev
+[websiterepo]: https://github.com/FluorineOS/fluorine-website
 [main]: https://github.com/FluorineOS/fluorine
 [releases]: https://github.com/FluorineOS/fluorine/releases/latest
 [apt]: https://fluorineos.github.io/apt-repo
