@@ -13,6 +13,7 @@ REPO_ROOT=$(dirname -- "${SCRIPT_DIR}")
 WINDOWS_ISO_NAME="FluorineOS-0.0.1-amd64.iso"
 MEMORY=4096
 CPUS=4
+SERIAL_SOCKET="${TMPDIR:-/tmp}/fluorineos-serial.sock"
 
 EXPORT_WIN=0
 VARS_COPY=""
@@ -170,7 +171,9 @@ main() {
         -cdrom "${iso}" \
         -boot d \
         -netdev user,id=net0 \
-        -device virtio-net-pci,netdev=net0
+        -device virtio-net-pci,netdev=net0 \
+        -chardev "socket,id=flrserial,path=${SERIAL_SOCKET},server=on,wait=off" \
+        -serial chardev:flrserial
 }
 
 main "$@"

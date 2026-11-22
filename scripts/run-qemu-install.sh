@@ -15,6 +15,7 @@ VARS_IMAGE="${REPO_ROOT}/test-vars.fd"
 DISK_SIZE="25G"
 MEMORY=4096
 CPUS=4
+SERIAL_SOCKET="${TMPDIR:-/tmp}/fluorineos-serial.sock"
 
 BOOT_DISK=0
 FIRMWARE_ARGS=()
@@ -154,7 +155,9 @@ main() {
         "${boot_args[@]}" \
         -drive "file=${DISK_IMAGE},format=qcow2,if=virtio" \
         -netdev user,id=net0 \
-        -device virtio-net-pci,netdev=net0
+        -device virtio-net-pci,netdev=net0 \
+        -chardev "socket,id=flrserial,path=${SERIAL_SOCKET},server=on,wait=off" \
+        -serial chardev:flrserial
 }
 
 main "$@"
