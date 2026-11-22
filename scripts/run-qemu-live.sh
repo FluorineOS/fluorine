@@ -51,6 +51,7 @@ find_iso() {
     local candidate
 
     for candidate in \
+        "${REPO_ROOT}/FluorineOS-0.0.1-amd64.iso" \
         "${REPO_ROOT}/FluorineOS-0.0.1-amd64.hybrid.iso" \
         "${REPO_ROOT}/live-image-amd64.hybrid.iso"; do
         if [ -f "${candidate}" ]; then
@@ -82,6 +83,10 @@ export_to_windows() {
     mkdir -p -- "${downloads}"
     cp -- "${iso}" "${downloads}/${WINDOWS_ISO_NAME}"
     printf 'Exported ISO to %s\n' "${downloads}/${WINDOWS_ISO_NAME}"
+    if [ -f "${iso}.sha256" ]; then
+        cp -- "${iso}.sha256" "${downloads}/${WINDOWS_ISO_NAME}.sha256"
+        printf 'Exported checksum to %s\n' "${downloads}/${WINDOWS_ISO_NAME}.sha256"
+    fi
 }
 
 build_firmware_args() {

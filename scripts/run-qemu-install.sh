@@ -45,6 +45,7 @@ find_iso() {
     local candidate
 
     for candidate in \
+        "${REPO_ROOT}/FluorineOS-0.0.1-amd64.iso" \
         "${REPO_ROOT}/FluorineOS-0.0.1-amd64.hybrid.iso" \
         "${REPO_ROOT}/live-image-amd64.hybrid.iso"; do
         if [ -f "${candidate}" ]; then
