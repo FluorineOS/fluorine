@@ -1,5 +1,8 @@
 [terminal]
-vt = 1
+# Debian's greetd.service declares Conflicts=getty@tty7.service, so the
+# greeter belongs on vt 7. Leaving it on vt 1 makes it compete with
+# getty@tty1, which then owns the terminal when greetd restarts.
+vt = 7
 
 [default_session]
 command = "tuigreet --time --remember --cmd start-hyprland"
