@@ -1,5 +1,6 @@
 calamares
 calamares-settings-debian
+libxcb-cursor0
 live-boot
 live-config
 live-config-systemd
