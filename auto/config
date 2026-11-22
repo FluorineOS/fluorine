@@ -16,5 +16,5 @@ lb config noauto \
   --iso-publisher "FluorineOS; https://github.com/FluorineOS" \
   --iso-volume "FLUORINEOS_0_0_1" \
   --image-name "FluorineOS-0.0.1" \
-  --bootappend-live "boot=live components quiet splash nvidia_drm.modeset=1 nvidia_drm.fbdev=1" \
+  --bootappend-live "boot=live components quiet splash nvidia_drm.modeset=1 nvidia_drm.fbdev=1 systemd.setenv=WLR_RENDERER_ALLOW_SOFTWARE=1" \
   "${@}"
