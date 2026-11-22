@@ -141,7 +141,13 @@ main() {
         printf 'Acceleration: TCG (software emulation)\n'
     fi
 
-    if is_wsl; then
+    if [ -n "${FLUORINEOS_VNC:-}" ]; then
+        # Headless viewing path. QEMU serves the framebuffer on
+        # 127.0.0.1:5900+N; bridge it to a browser with
+        # websockify 6080 127.0.0.1:5900+N and /usr/share/novnc.
+        gpu_args=(-vga none -device virtio-vga -display none -vnc "127.0.0.1:${FLUORINEOS_VNC}")
+        printf 'Display: virtio-vga over VNC 127.0.0.1:590%s\n' "${FLUORINEOS_VNC}"
+    elif is_wsl; then
         # WSLg's D3D12 Mesa path crashes with gl=on, so stay on the 2D device.
         gpu_args=(-vga none -device virtio-vga -display gtk)
         printf 'Display: virtio-vga without 3D acceleration (WSL2)\n'
