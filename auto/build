@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+lb build noauto "${@}" 2>&1 | tee "build-$(date +%Y%m%d-%H%M%S).log"

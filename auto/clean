@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Preserve the bootstrap package cache and bootstrap stages unless the caller
+# explicitly asks for a full purge. This keeps normal clean cycles fast while
+# still allowing a destructive reset when it is intentional.
+
+purge=false
+for arg in "$@"; do
+    if [[ "$arg" == "--purge" ]]; then
+        purge=true
+        break
+    fi
+done
+
+if [[ "$purge" == true ]]; then
+    exec lb clean noauto "$@"
+fi
+
+preserve_dir="$(mktemp -d)"
+preserved=()
+
+restore_cache() {
+    local path
+
+    for path in "${preserved[@]}"; do
+        if [[ ! -e "${preserve_dir}/${path}" ]]; then
+            continue
+        fi
+
+        if [[ -e "${path}" ]]; then
+            if [[ -d "${path}" && -d "${preserve_dir}/${path}" ]]; then
+                cp -a "${preserve_dir}/${path}/." "${path}/"
+            else
+                cp -a "${preserve_dir}/${path}" "${path}"
+            fi
+        else
+            mkdir -p "$(dirname "${path}")"
+            mv "${preserve_dir}/${path}" "${path}"
+        fi
+    done
+
+    rm -rf "${preserve_dir}"
+}
+
+trap restore_cache EXIT
+
+for path in cache/packages.bootstrap cache/stages_bootstrap; do
+    if [[ -e "${path}" ]]; then
+        mkdir -p "${preserve_dir}/$(dirname "${path}")"
+        mv "${path}" "${preserve_dir}/${path}"
+        preserved+=("${path}")
+    fi
+done
+
+lb clean noauto "$@"

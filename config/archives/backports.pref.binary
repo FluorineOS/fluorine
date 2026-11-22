@@ -1,0 +1,3 @@
+Package: hyprland* hypridle* hyprlock* libaquamarine* libhypr* xdg-desktop-portal-hyprland wayland-protocols
+Pin: release a=trixie-backports
+Pin-Priority: 900
