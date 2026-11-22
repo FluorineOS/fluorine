@@ -25,6 +25,24 @@ contract with end users: internal state, roadmap prompts, build notes, and
 
 Also check `SOURCE_OF_TRUTH/BUILD_STATUS.md` for current milestone progress.
 
+## Required repository and commit workflow
+
+- The Windows checkouts are siblings:
+  `C:\Users\gowth\OneDrive\Desktop\FluorineOS` is the primary
+  `FluorineOS/fluorine` repository, while `C:\Users\gowth\fluorine-workspace` is a
+  container for separate companion repositories, not a Git repository itself.
+- Resolve the owning Git root before editing or committing. Each project repository
+  has its own GitHub remote under `https://github.com/FluorineOS`; the organization
+  profile repository is rooted at `.github`, with its page content in `.github/profile`.
+- Commit every intentional tracked project change in its owning repository before
+  reporting the task complete. For changes to multiple repositories, create a separate
+  commit in each repository. Never combine sibling repositories in one commit or include
+  unrelated pre-existing changes.
+- Keep local-only `SOURCE_OF_TRUTH/` files, secrets, credentials, and ignored/generated
+  build output out of commits. Do not force-add them to satisfy the commit requirement.
+- Follow `SOURCE_OF_TRUTH/RELEASE_INSTRUCTIONS.md` for commit format and push commits to
+  `origin` when requested or required by the release workflow.
+
 The zero-emoji mandate and semantic versioning rules in
 `SOURCE_OF_TRUTH/RELEASE_INSTRUCTIONS.md` are mandatory for every session and every
 repository in the FluorineOS organization. Use plain ASCII text and standard Markdown. Do
