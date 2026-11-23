@@ -171,7 +171,8 @@ keeping the bootstrap cache.
 
 ## License
 
-FluorineOS is open-source software distributed under the GNU General Public License v3.
+FluorineOS is open-source software released under the MIT License. See [`LICENSE`](LICENSE)
+for the full text.
 
 [website]: https://fluorineos.pages.dev
 [websiterepo]: https://github.com/FluorineOS/fluorine-website
