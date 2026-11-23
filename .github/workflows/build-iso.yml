@@ -49,7 +49,20 @@ jobs:
           restore-keys: |
             live-build-${{ runner.os }}-
 
+      - name: Resolve the image version
+        id: version
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="$(<VERSION)"
+          fi
+          printf 'value=%s\n' "${version}" >> "$GITHUB_OUTPUT"
+
       - name: Configure live-build
+        env:
+          FLUORINE_VERSION: ${{ steps.version.outputs.value }}
         run: ./auto/config
 
       - name: Build the ISO
@@ -57,14 +70,13 @@ jobs:
 
       - name: Normalize the ISO name and write the checksum
         env:
-          REF_NAME: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.value }}
         run: |
           set -euo pipefail
-          version="${REF_NAME#v}"
-          iso="FluorineOS-${version}-amd64.iso"
+          iso="FluorineOS-${VERSION}-amd64.iso"
 
           source=""
-          for candidate in FluorineOS-*-amd64.iso; do
+          for candidate in FluorineOS-*-amd64.hybrid.iso FluorineOS-*-amd64.iso; do
             if [ -f "$candidate" ]; then
               source="$candidate"
               break
@@ -110,12 +122,11 @@ jobs:
 
             Verify the download before writing it to media:
 
-                sha256sum -c FluorineOS-${{ github.ref_name }}.sha256
+                sha256sum -c FluorineOS-${{ steps.version.outputs.value }}-amd64.iso.sha256
 
-            The checksum file assumes the ISO keeps the name it has in this release.
-            A UEFI system booting the image needs Secure Boot disabled, or the
-            "Safe Graphics" menu entry when the GPU cannot provide a hardware
-            accelerated renderer.
+            The image includes a shim-based UEFI boot path. If the firmware rejects
+            the bootloader, disable Secure Boot or select the "Safe Graphics" menu
+            entry when the GPU cannot provide a hardware accelerated renderer.
           files: |
             FluorineOS-*.iso
             FluorineOS-*.iso.sha256
