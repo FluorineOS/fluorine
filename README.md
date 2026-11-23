@@ -81,6 +81,8 @@ Default shortcuts are bound in `~/.config/hypr/hyprland.lua`:
 | `SUPER + Shift + S` | Interactive area screenshot (`flr-shot`) |
 | `SUPER + /` | Display keybinding reference dialog (`flr-keys`) |
 | `SUPER + L` | Lock workstation screen (`hyprlock`) |
+| `SUPER + Arrow keys` | Move focus in that direction |
+| `SUPER + H J K L` | Move focus left, down, up, right |
 | `SUPER + 1..9` | Switch to workspace 1 through 9 |
 | `SUPER + Shift + 1..9` | Move active window to workspace 1 through 9 |
 
