@@ -10,7 +10,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(dirname -- "${SCRIPT_DIR}")
-WINDOWS_ISO_NAME="FluorineOS-0.0.1-amd64.iso"
+WINDOWS_ISO_NAME="FluorineOS-0.1.0-amd64.iso"
 MEMORY=4096
 CPUS=4
 SERIAL_SOCKET="${TMPDIR:-/tmp}/fluorineos-serial.sock"
@@ -52,8 +52,8 @@ find_iso() {
     local candidate
 
     for candidate in \
-        "${REPO_ROOT}/FluorineOS-0.0.1-amd64.iso" \
-        "${REPO_ROOT}/FluorineOS-0.0.1-amd64.hybrid.iso" \
+        "${REPO_ROOT}/FluorineOS-0.1.0-amd64.iso" \
+        "${REPO_ROOT}/FluorineOS-0.1.0-amd64.hybrid.iso" \
         "${REPO_ROOT}/live-image-amd64.hybrid.iso"; do
         if [ -f "${candidate}" ]; then
             printf '%s\n' "${candidate}"
@@ -144,10 +144,10 @@ main() {
 
     if [ -n "${FLUORINEOS_VNC:-}" ]; then
         # Headless viewing path. QEMU serves the framebuffer on
-        # 127.0.0.1:5900+N; bridge it to a browser with
-        # websockify 6080 127.0.0.1:5900+N and /usr/share/novnc.
-        gpu_args=(-vga none -device virtio-vga -display none -vnc "127.0.0.1:${FLUORINEOS_VNC}")
-        printf 'Display: virtio-vga over VNC 127.0.0.1:590%s\n' "${FLUORINEOS_VNC}"
+        # 127.0.1.0:5900+N; bridge it to a browser with
+        # websockify 6080 127.0.1.0:5900+N and /usr/share/novnc.
+        gpu_args=(-vga none -device virtio-vga -display none -vnc "127.0.1.0:${FLUORINEOS_VNC}")
+        printf 'Display: virtio-vga over VNC 127.0.1.0:590%s\n' "${FLUORINEOS_VNC}"
     elif is_wsl; then
         # WSLg's D3D12 Mesa path crashes with gl=on, so stay on the 2D device.
         gpu_args=(-vga none -device virtio-vga -display gtk)
