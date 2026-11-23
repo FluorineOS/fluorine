@@ -20,8 +20,8 @@ releases.
 | Image file | `FluorineOS-0.0.1-amd64.iso` |
 | Checksum file | `FluorineOS-0.0.1-amd64.iso.sha256` |
 | Release page | [FluorineOS Releases][releases] |
-| Image size | `1375442944` bytes (1.28 GiB) |
-| SHA-256 | `17716220f311141ad5ad05eb50bfcb54806f05d81bcccb26ba3a02d9f1234e0a` |
+| Image size | `1388937216` bytes (1.29 GiB) |
+| SHA-256 | `352724cf630ce6ea900256131cf45dfdbebcb888cf96ab313ec9ec1d7d0fc8c0` |
 
 Download both the image and the checksum file, then verify cryptographic integrity:
 
