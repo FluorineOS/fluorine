@@ -114,11 +114,28 @@ jobs:
           prerelease: false
           fail_on_unmatched_files: true
           body: |
-            FluorineOS ${{ github.ref_name }} (amd64)
+            FluorineOS ${{ steps.version.outputs.value }} (amd64)
 
             Live image built from the Debian 13 (trixie) live-build tree, with the
             Hyprland session, Calamares installer, and the fluorine-desktop,
             fluorine-artwork, and fluorine-keyring packages.
+
+            Highlights in this release:
+
+            - flr-doctor reports session, font, keyring, and APT repository health
+              with a plain summary of OK, WARN, and INFO findings.
+            - A one-time first-login guide shows the Hyprland keybindings and then
+              leaves a marker so it never repeats.
+            - Idle handling, screen locking, media keys, and clipboard history are
+              configured out of the box through fluorine-desktop and hypridle.
+            - Consistent GTK, Qt, dconf, and font defaults from fluorine-artwork.
+            - Signed APT repository for in-place upgrades at
+              https://fluorineos.github.io/apt-repo
+
+            Existing 0.0.x installations upgrade in place:
+
+                apt update
+                apt upgrade
 
             Verify the download before writing it to media:
 
@@ -127,6 +144,8 @@ jobs:
             The image includes a shim-based UEFI boot path. If the firmware rejects
             the bootloader, disable Secure Boot or select the "Safe Graphics" menu
             entry when the GPU cannot provide a hardware accelerated renderer.
+
+            Documentation and downloads: https://fluorineos.pages.dev
           files: |
             FluorineOS-*.iso
             FluorineOS-*.iso.sha256
