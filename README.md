@@ -7,7 +7,7 @@ Wayland compositor. The interface uses a pure AMOLED black canvas (`#000000`) wi
 reactive lime accent (`#B4F03A`) and hairline borders (`#1C2229`). Compositor configuration
 is native Hyprland 0.55 Lua, and installation is handled offline by Calamares.
 
-[Website](https://fluorineos.pages.dev) | [Release 0.0.1](https://github.com/FluorineOS/fluorine/releases/tag/v0.0.1) | [APT Repository](https://fluorineos.github.io/apt-repo) | [Issue Tracker](https://github.com/FluorineOS/fluorine/issues)
+[Website][website] | [Release 0.0.1][releasetag] | [APT Repository][apt] | [Issues][issues]
 
 ## Download and Verify
 
@@ -17,15 +17,17 @@ releases.
 | Item | Value |
 | --- | --- |
 | Release version | `0.0.1` |
-| Image file | `FluorineOS-0.0.1-amd64.iso` |
-| Checksum file | `FluorineOS-0.0.1-amd64.iso.sha256` |
+| Image file | [`FluorineOS-0.0.1-amd64.iso`][iso] |
+| Checksum file | [`FluorineOS-0.0.1-amd64.iso.sha256`][sum] |
 | Release page | [FluorineOS Releases][releases] |
 | Image size | `1388937216` bytes (1.29 GiB) |
 | SHA-256 | `352724cf630ce6ea900256131cf45dfdbebcb888cf96ab313ec9ec1d7d0fc8c0` |
 
-Download both the image and the checksum file, then verify cryptographic integrity:
+Download both files, then verify cryptographic integrity:
 
 ```sh
+curl -LO https://github.com/FluorineOS/fluorine/releases/download/v0.0.1/FluorineOS-0.0.1-amd64.iso
+curl -LO https://github.com/FluorineOS/fluorine/releases/download/v0.0.1/FluorineOS-0.0.1-amd64.iso.sha256
 sha256sum -c FluorineOS-0.0.1-amd64.iso.sha256
 ```
 
@@ -43,7 +45,7 @@ FluorineOS builds directly on Debian 13 (`trixie`) with Hyprland pinned from the
 | Display manager | `greetd` + `tuigreet` | Minimal console login launcher |
 | Status bar | Waybar | Top bar with workspace indicator and system monitors |
 | Application menu | Fuzzel | Wayland desktop application launcher |
-| Notification daemon | SwayNC | Notification center and control panel |
+| Notification daemon | `sway-notification-center` | Notification center and control panel |
 | Terminal | Kitty | Fast terminal emulator using JetBrains Mono |
 | Audio | PipeWire + WirePlumber | System audio server and media routing |
 | Memory management | ZRAM (`zstd`) | Compressed in-memory swap device |
@@ -92,7 +94,7 @@ Default shortcuts are bound in `~/.config/hypr/hyprland.lua`:
 | Memory | 4 GB RAM | 8 GB RAM or more |
 | Storage | 20 GB free disk | 50 GB NVMe or SSD |
 | Firmware | UEFI 64-bit | UEFI 64-bit |
-| Graphics | DRM/KMS compatible GPU | Intel, AMD, or Nouveau |
+| Graphics | DRM/KMS compatible GPU | Intel, AMD, or NVIDIA |
 
 ### Flashing to USB
 
@@ -143,22 +145,27 @@ qemu-system-x86_64 \
 
 ## Building from Source
 
-Build dependencies require Debian 13 (`trixie`) and `live-build`:
+The build requires Debian 13 (`trixie`) on `amd64` and the live-build toolchain:
 
 ```sh
 sudo apt-get update
-sudo apt-get install -y live-build debootstrap xorriso squashfs-tools
+sudo apt-get install -y live-build debootstrap xorriso squashfs-tools isolinux syslinux-efi
 ```
 
-Clone the repository and run live-build:
+Clone the repository and run the build scripts. `auto/config` applies the
+`trixie-backports` archive, the APT pin, and the FluorineOS package set, and `auto/build`
+assembles the image:
 
 ```sh
 git clone https://github.com/FluorineOS/fluorine.git
 cd fluorine
-sudo lb clean --purge
-sudo lb config
-sudo lb build
+sudo ./auto/config
+sudo ./auto/build
 ```
+
+The image is written to `FluorineOS-0.0.1-amd64.hybrid.iso`. Set `FLUORINE_VERSION` to
+build a different version label, and run `sudo ./auto/clean` to reset the tree while
+keeping the bootstrap cache.
 
 ## License
 
@@ -167,7 +174,10 @@ FluorineOS is open-source software distributed under the GNU General Public Lice
 [website]: https://fluorineos.pages.dev
 [websiterepo]: https://github.com/FluorineOS/fluorine-website
 [main]: https://github.com/FluorineOS/fluorine
-[releases]: https://github.com/FluorineOS/fluorine/releases/tag/v0.0.1
+[releases]: https://github.com/FluorineOS/fluorine/releases/latest
+[releasetag]: https://github.com/FluorineOS/fluorine/releases/tag/v0.0.1
+[iso]: https://github.com/FluorineOS/fluorine/releases/download/v0.0.1/FluorineOS-0.0.1-amd64.iso
+[sum]: https://github.com/FluorineOS/fluorine/releases/download/v0.0.1/FluorineOS-0.0.1-amd64.iso.sha256
 [apt]: https://fluorineos.github.io/apt-repo
 [issues]: https://github.com/FluorineOS/fluorine/issues
 [desktop]: https://github.com/FluorineOS/fluorine-desktop
