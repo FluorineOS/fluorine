@@ -7,7 +7,7 @@ Wayland compositor. The interface uses a pure AMOLED black canvas (`#000000`) wi
 reactive lime accent (`#B4F03A`) and hairline borders (`#1C2229`). Compositor configuration
 is native Hyprland 0.55 Lua, and installation is handled offline by Calamares.
 
-[Website][website] | [Release 0.0.1][releasetag] | [APT Repository][apt] | [Issues][issues]
+[Website][website] | [Release 0.1.0][releasetag] | [APT Repository][apt] | [Issues][issues]
 
 ## Download and Verify
 
@@ -16,19 +16,19 @@ releases.
 
 | Item | Value |
 | --- | --- |
-| Release version | `0.0.1` |
-| Image file | [`FluorineOS-0.0.1-amd64.iso`][iso] |
-| Checksum file | [`FluorineOS-0.0.1-amd64.iso.sha256`][sum] |
+| Release version | `0.1.0` |
+| Image file | [`FluorineOS-0.1.0-amd64.iso`][iso] |
+| Checksum file | [`FluorineOS-0.1.0-amd64.iso.sha256`][sum] |
 | Release page | [FluorineOS Releases][releases] |
-| Image size | `1388937216` bytes (1.29 GiB) |
-| SHA-256 | `352724cf630ce6ea900256131cf45dfdbebcb888cf96ab313ec9ec1d7d0fc8c0` |
+| Image size | `1390505984` bytes (1.30 GiB) |
+| SHA-256 | `96e9114ed09c6e82629725d2fc092205fcb22e6d10979b05e28e9101e788672f` |
 
 Download both files, then verify cryptographic integrity:
 
 ```sh
-curl -LO https://github.com/FluorineOS/fluorine/releases/download/v0.0.1/FluorineOS-0.0.1-amd64.iso
-curl -LO https://github.com/FluorineOS/fluorine/releases/download/v0.0.1/FluorineOS-0.0.1-amd64.iso.sha256
-sha256sum -c FluorineOS-0.0.1-amd64.iso.sha256
+curl -LO https://github.com/FluorineOS/fluorine/releases/download/v0.1.0/FluorineOS-0.1.0-amd64.iso
+curl -LO https://github.com/FluorineOS/fluorine/releases/download/v0.1.0/FluorineOS-0.1.0-amd64.iso.sha256
+sha256sum -c FluorineOS-0.1.0-amd64.iso.sha256
 ```
 
 The command prints `OK` when the image matches the digest above.
@@ -103,7 +103,7 @@ Default shortcuts are bound in `~/.config/hypr/hyprland.lua`:
 Write the verified ISO image to a USB flash drive using `dd`:
 
 ```sh
-sudo dd if=FluorineOS-0.0.1-amd64.iso of=/dev/sdX bs=4M status=progress oflag=sync
+sudo dd if=FluorineOS-0.1.0-amd64.iso of=/dev/sdX bs=4M status=progress oflag=sync
 ```
 
 Replace `/dev/sdX` with the target block device node.
@@ -120,7 +120,7 @@ qemu-system-x86_64 \
   -bios /usr/share/ovmf/OVMF.fd \
   -vga virtio \
   -display gtk,gl=on \
-  -cdrom FluorineOS-0.0.1-amd64.iso
+  -cdrom FluorineOS-0.1.0-amd64.iso
 ```
 
 For software rendering fallback without KVM acceleration:
@@ -131,7 +131,7 @@ qemu-system-x86_64 \
   -smp 4 \
   -bios /usr/share/ovmf/OVMF.fd \
   -vga std \
-  -cdrom FluorineOS-0.0.1-amd64.iso
+  -cdrom FluorineOS-0.1.0-amd64.iso
 ```
 
 ## Repositories
@@ -165,7 +165,7 @@ sudo ./auto/config
 sudo ./auto/build
 ```
 
-The image is written to `FluorineOS-0.0.1-amd64.hybrid.iso`. Set `FLUORINE_VERSION` to
+The image is written to `FluorineOS-0.1.0-amd64.hybrid.iso`. Set `FLUORINE_VERSION` to
 build a different version label, and run `sudo ./auto/clean` to reset the tree while
 keeping the bootstrap cache.
 
@@ -178,9 +178,9 @@ for the full text.
 [websiterepo]: https://github.com/FluorineOS/fluorine-website
 [main]: https://github.com/FluorineOS/fluorine
 [releases]: https://github.com/FluorineOS/fluorine/releases/latest
-[releasetag]: https://github.com/FluorineOS/fluorine/releases/tag/v0.0.1
-[iso]: https://github.com/FluorineOS/fluorine/releases/download/v0.0.1/FluorineOS-0.0.1-amd64.iso
-[sum]: https://github.com/FluorineOS/fluorine/releases/download/v0.0.1/FluorineOS-0.0.1-amd64.iso.sha256
+[releasetag]: https://github.com/FluorineOS/fluorine/releases/tag/v0.1.0
+[iso]: https://github.com/FluorineOS/fluorine/releases/download/v0.1.0/FluorineOS-0.1.0-amd64.iso
+[sum]: https://github.com/FluorineOS/fluorine/releases/download/v0.1.0/FluorineOS-0.1.0-amd64.iso.sha256
 [apt]: https://fluorineos.github.io/apt-repo
 [issues]: https://github.com/FluorineOS/fluorine/issues
 [desktop]: https://github.com/FluorineOS/fluorine-desktop
