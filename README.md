@@ -7,7 +7,7 @@ Wayland compositor. The interface uses a pure AMOLED black canvas (`#000000`) wi
 reactive lime accent (`#B4F03A`) and hairline borders (`#1C2229`). Compositor configuration
 is native Hyprland 0.55 Lua, and installation is handled offline by Calamares.
 
-[Website](https://fluorineos.pages.dev) | [Latest Release (0.0.1)](https://github.com/FluorineOS/fluorine/releases/latest) | [APT Repository](https://fluorineos.github.io/apt-repo) | [Issue Tracker](https://github.com/FluorineOS/fluorine/issues)
+[Website](https://fluorineos.pages.dev) | [Release 0.0.1](https://github.com/FluorineOS/fluorine/releases/tag/v0.0.1) | [APT Repository](https://fluorineos.github.io/apt-repo) | [Issue Tracker](https://github.com/FluorineOS/fluorine/issues)
 
 ## Download and Verify
 
@@ -167,7 +167,7 @@ FluorineOS is open-source software distributed under the GNU General Public Lice
 [website]: https://fluorineos.pages.dev
 [websiterepo]: https://github.com/FluorineOS/fluorine-website
 [main]: https://github.com/FluorineOS/fluorine
-[releases]: https://github.com/FluorineOS/fluorine/releases/latest
+[releases]: https://github.com/FluorineOS/fluorine/releases/tag/v0.0.1
 [apt]: https://fluorineos.github.io/apt-repo
 [issues]: https://github.com/FluorineOS/fluorine/issues
 [desktop]: https://github.com/FluorineOS/fluorine-desktop
