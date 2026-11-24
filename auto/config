@@ -20,8 +20,8 @@ lb config noauto \
   --distribution trixie \
   --parent-distribution trixie \
   --architectures amd64 \
-  --archive-areas "main contrib non-free-firmware" \
-  --parent-archive-areas "main contrib non-free-firmware" \
+  --archive-areas "main contrib non-free non-free-firmware" \
+  --parent-archive-areas "main contrib non-free non-free-firmware" \
   --debian-installer none \
   --bootloaders "grub-efi" \
   --uefi-secure-boot enable \

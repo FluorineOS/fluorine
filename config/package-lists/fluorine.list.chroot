@@ -1,3 +1,14 @@
 fluorine-desktop
 fluorine-artwork
 fluorine-keyring
+
+# Bare-metal hardware support: firmware blobs, CPU microcode, and the initramfs
+# hooks that unlock a LUKS2 root volume.
+firmware-linux-free
+firmware-linux-nonfree
+firmware-iwlwifi
+firmware-realtek
+firmware-atheros
+intel-microcode
+amd64-microcode
+cryptsetup-initramfs
