@@ -5,6 +5,11 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build without the leading v. Defaults to the VERSION file."
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -13,31 +18,44 @@ concurrency:
   group: build-iso-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  DEBIAN_FRONTEND: noninteractive
+
 jobs:
   build-iso:
-    name: Build FluorineOS ISO
+    name: Build and verify FluorineOS ISO
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 150
     container:
       image: debian:trixie
       options: --privileged
+
     steps:
       - name: Check out the live-build tree
         uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Install build and verification dependencies
         run: |
+          set -euo pipefail
           apt-get update
-          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+          apt-get install -y --no-install-recommends \
             ca-certificates \
             curl \
+            dosfstools \
             git \
+            grub-efi-amd64-bin \
+            grub-pc-bin \
             isolinux \
             live-build \
+            mtools \
+            ovmf \
+            qemu-system-x86 \
             squashfs-tools \
+            sudo \
             syslinux-efi \
             xorriso
           lb --version
+          qemu-system-x86_64 --version
 
       - name: Restore the live-build bootstrap cache
         uses: actions/cache@v4
@@ -45,64 +63,256 @@ jobs:
           path: |
             cache/packages.bootstrap
             cache/stages_bootstrap
-          key: live-build-${{ runner.os }}-${{ hashFiles('auto/config', 'config/archives/**', 'config/package-lists/**') }}
+          key: live-build-${{ runner.os }}-${{ hashFiles('auto/config', 'config/archives/**', 'config/package-lists/**', 'config/packages.chroot/**') }}
           restore-keys: |
             live-build-${{ runner.os }}-
 
       - name: Resolve the image version
         id: version
+        shell: bash
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
+
+          version=""
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             version="${GITHUB_REF_NAME#v}"
-          else
-            version="$(<VERSION)"
+          elif [ -n "${DISPATCH_VERSION}" ]; then
+            version="${DISPATCH_VERSION}"
+            version="${version#v}"
+          elif [ -f VERSION ]; then
+            version="$(< VERSION)"
           fi
-          printf 'value=%s\n' "${version}" >> "$GITHUB_OUTPUT"
+
+          version="${version//[[:space:]]/}"
+
+          if ! printf '%s' "${version}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            printf 'Cannot resolve a semantic version from ref %s (got "%s").\n' \
+              "${GITHUB_REF_NAME}" "${version}" >&2
+            exit 1
+          fi
+
+          printf 'Resolved version %s from %s\n' "${version}" "${GITHUB_REF_TYPE}"
+          printf 'value=%s\n' "${version}" >> "${GITHUB_OUTPUT}"
 
       - name: Configure live-build
         env:
           FLUORINE_VERSION: ${{ steps.version.outputs.value }}
-        run: ./auto/config
+        # auto/config derives the image name, ISO application id, and volume label
+        # from the version. The architecture suffix is added by live-build itself,
+        # so a literal --image-name with -amd64 would produce a doubled suffix.
+        run: sudo ./auto/config
 
       - name: Build the ISO
-        run: ./auto/build
+        run: sudo ./auto/build
 
       - name: Normalize the ISO name and write the checksum
         env:
           VERSION: ${{ steps.version.outputs.value }}
+        shell: bash
         run: |
           set -euo pipefail
           iso="FluorineOS-${VERSION}-amd64.iso"
 
           source=""
           for candidate in FluorineOS-*-amd64.hybrid.iso FluorineOS-*-amd64.iso; do
-            if [ -f "$candidate" ]; then
-              source="$candidate"
+            if [ -f "${candidate}" ]; then
+              source="${candidate}"
               break
             fi
           done
-          if [ -z "$source" ]; then
-            echo "No FluorineOS ISO was produced by live-build." >&2
+
+          if [ -z "${source}" ]; then
+            printf 'No FluorineOS ISO was produced by live-build.\n' >&2
             exit 1
           fi
 
-          if [ "$source" != "$iso" ]; then
-            mv -- "$source" "$iso"
+          if [ "${source}" != "${iso}" ]; then
+            mv -- "${source}" "${iso}"
           fi
 
-          sha256sum "$iso" > "$iso.sha256"
-          ls -l -- "$iso" "$iso.sha256"
+          sha256sum "${iso}" > "${iso}.sha256"
+          sha256sum -c "${iso}.sha256"
+          ls -l -- "${iso}" "${iso}.sha256"
+
+      - name: Verify the UEFI firmware boot path
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          iso="FluorineOS-${VERSION}-amd64.iso"
+          workdir="$(mktemp -d)"
+          log="${workdir}/uefi-boot.log"
+
+          code=""
+          for candidate in /usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/OVMF/OVMF_CODE.fd /usr/share/ovmf/OVMF.fd; do
+            if [ -f "${candidate}" ]; then
+              code="${candidate}"
+              break
+            fi
+          done
+
+          if [ -z "${code}" ]; then
+            printf 'OVMF firmware is not installed.\n' >&2
+            exit 1
+          fi
+
+          vars_source=""
+          for candidate in /usr/share/OVMF/OVMF_VARS_4M.fd /usr/share/OVMF/OVMF_VARS.fd; do
+            if [ -f "${candidate}" ]; then
+              vars_source="${candidate}"
+              break
+            fi
+          done
+
+          accel=(-accel tcg)
+          if [ -w /dev/kvm ]; then
+            accel=(-accel kvm -cpu host)
+          else
+            printf '::warning::Hardware acceleration is unavailable; the firmware boot check runs under TCG.\n'
+          fi
+
+          cp -- "${code}" "${workdir}/code.fd"
+          chmod 0644 "${workdir}/code.fd"
+          if [ -n "${vars_source}" ]; then
+            cp -- "${vars_source}" "${workdir}/vars.fd"
+            chmod 0644 "${workdir}/vars.fd"
+          else
+            : > "${workdir}/vars.fd"
+            truncate -s 540672 "${workdir}/vars.fd"
+          fi
+
+          timeout 60 qemu-system-x86_64 \
+            -machine q35 \
+            "${accel[@]}" \
+            -m 2048 -smp 2 \
+            -drive if=pflash,format=raw,readonly=on,file="${workdir}/code.fd" \
+            -drive if=pflash,format=raw,file="${workdir}/vars.fd" \
+            -device virtio-vga -display none \
+            -drive file="${iso}",media=cdrom,readonly=on -boot d \
+            -serial "file:${log}" -no-reboot || true
+
+          if ! grep -qiE 'BdsDxe: starting Boot[0-9]+' "${log}"; then
+            printf 'The firmware did not start a boot entry from the ISO.\n' >&2
+            tail -40 "${log}" >&2 || true
+            exit 1
+          fi
+
+          if grep -qiE 'Boot Failed|No bootable option|Failed to load image' "${log}"; then
+            printf 'The firmware reported a failed boot attempt.\n' >&2
+            tail -40 "${log}" >&2
+            exit 1
+          fi
+
+          printf 'UEFI firmware started the ISO boot entry.\n'
+          grep -aiE 'BdsDxe: starting Boot[0-9]+' "${log}"
+
+      - name: Verify the live system boots headless
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          iso="FluorineOS-${VERSION}-amd64.iso"
+          workdir="$(mktemp -d)"
+          log="${workdir}/live-boot.log"
+          mountpoint="${workdir}/iso"
+
+          mkdir -p "${mountpoint}"
+          sudo mount -o loop,ro "${iso}" "${mountpoint}"
+          cp -- "${mountpoint}"/live/vmlinuz-* "${workdir}/vmlinuz"
+          cp -- "${mountpoint}"/live/initrd.img-* "${workdir}/initrd"
+          sudo umount "${mountpoint}"
+
+          accel=(-accel tcg)
+          if [ -w /dev/kvm ]; then
+            accel=(-accel kvm -cpu host)
+          else
+            printf '::warning::Hardware acceleration is unavailable; the boot check runs under TCG and may need the full timeout.\n'
+          fi
+
+          qemu-system-x86_64 \
+            -machine q35 \
+            "${accel[@]}" \
+            -m 2048 -smp 2 \
+            -kernel "${workdir}/vmlinuz" \
+            -initrd "${workdir}/initrd" \
+            -append "boot=live components console=ttyS0,115200 systemd.journald.forward_to_console=1 systemd.setenv=WLR_RENDERER_ALLOW_SOFTWARE=1" \
+            -device virtio-vga -display none \
+            -drive file="${iso}",media=cdrom,readonly=on \
+            -serial "file:${log}" -no-reboot &
+          qemu_pid=$!
+
+          cleanup() {
+            kill "${qemu_pid}" 2>/dev/null || true
+            wait "${qemu_pid}" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          deadline=$((SECONDS + 90))
+          while [ "${SECONDS}" -lt "${deadline}" ]; do
+            if grep -qE 'Reached target graphical.target' "${log}" 2>/dev/null; then
+              break
+            fi
+            sleep 3
+          done
+
+          printf 'Boot log after %s seconds (%s bytes):\n' "${SECONDS}" "$(stat -c %s "${log}" 2>/dev/null || printf 0)"
+
+          failed=0
+
+          require() {
+            local pattern="${1}"
+            local description="${2}"
+            if grep -aqE "${pattern}" "${log}"; then
+              printf 'found: %s\n' "${description}"
+            else
+              printf 'missing: %s\n' "${description}" >&2
+              failed=1
+            fi
+          }
+
+          forbid() {
+            local pattern="${1}"
+            local description="${2}"
+            if grep -aqE "${pattern}" "${log}"; then
+              printf 'unexpected: %s\n' "${description}" >&2
+              failed=1
+            else
+              printf 'absent: %s\n' "${description}"
+            fi
+          }
+
+          require 'Linux version [0-9]' 'kernel banner'
+          require 'squashfs: version' 'squashfs filesystem'
+          require 'Reached target multi-user.target' 'multi-user target'
+          require 'Reached target graphical.target' 'graphical target'
+
+          forbid 'Kernel panic' 'kernel panic'
+          forbid 'SQUASHFS error' 'squashfs error'
+          forbid 'Unable to find a medium containing a live file system' 'missing live medium'
+          forbid 'Failed to mount' 'failed mount'
+
+          if [ "${failed}" -ne 0 ]; then
+            printf '\nThe live system did not reach a clean graphical session.\n' >&2
+            tail -60 "${log}" >&2 || true
+            exit 1
+          fi
+
+          printf 'Live system reached graphical.target without boot errors.\n'
 
       - name: Upload the ISO as a workflow artifact
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         uses: actions/upload-artifact@v4
         with:
-          name: FluorineOS-${{ github.ref_name }}-amd64
+          name: FluorineOS-${{ steps.version.outputs.value }}-amd64
           path: |
-            FluorineOS-*-amd64.iso
-            FluorineOS-*-amd64.iso.sha256
+            FluorineOS-${{ steps.version.outputs.value }}-amd64.iso
+            FluorineOS-${{ steps.version.outputs.value }}-amd64.iso.sha256
           if-no-files-found: error
+          retention-days: 14
 
       - name: Publish the GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -120,19 +330,25 @@ jobs:
             Hyprland session, Calamares installer, and the fluorine-desktop,
             fluorine-artwork, and fluorine-keyring packages.
 
+            Every published image passed two automated checks before upload:
+
+            - UEFI firmware handoff: OVMF started the ISO boot entry.
+            - Headless live boot: the kernel, initramfs, and squashfs mounted, the
+              system reached graphical.target, and the log was free of kernel
+              panics and squashfs errors.
+
             Highlights in this release:
 
             - flr-doctor reports session, font, keyring, and APT repository health
               with a plain summary of OK, WARN, and INFO findings.
             - A one-time first-login guide shows the Hyprland keybindings and then
               leaves a marker so it never repeats.
-            - Idle handling, screen locking, media keys, and clipboard history are
-              configured out of the box through fluorine-desktop and hypridle.
-            - Consistent GTK, Qt, dconf, and font defaults from fluorine-artwork.
+            - Waybar exposes network, Bluetooth, and power profile controls, and
+              kanshi applies display layouts when monitors are connected.
             - Signed APT repository for in-place upgrades at
               https://fluorineos.github.io/apt-repo
 
-            Existing 0.0.x installations upgrade in place:
+            Existing installations upgrade in place:
 
                 apt update
                 apt upgrade
@@ -147,5 +363,5 @@ jobs:
 
             Documentation and downloads: https://fluorineos.pages.dev
           files: |
-            FluorineOS-*.iso
-            FluorineOS-*.iso.sha256
+            FluorineOS-${{ steps.version.outputs.value }}-amd64.iso
+            FluorineOS-${{ steps.version.outputs.value }}-amd64.iso.sha256
