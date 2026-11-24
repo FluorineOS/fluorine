@@ -12,3 +12,8 @@ firmware-atheros
 intel-microcode
 amd64-microcode
 cryptsetup-initramfs
+
+# Btrfs root filesystem and snapshot management. The installer creates @, @home,
+# and @snapshots subvolumes, and flr-snapshot drives snapper from the desktop.
+btrfs-progs
+snapper

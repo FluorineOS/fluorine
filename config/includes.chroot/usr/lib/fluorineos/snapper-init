@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Initialize a Snapper root configuration on an installed Btrfs system.
+#
+# Calamares runs this inside the target chroot through the shellprocess module,
+# after the packages step has installed snapper and btrfs-progs. It is
+# idempotent, so running it again on an existing system only verifies state.
+
+main() {
+    local template="/usr/share/snapper/config-templates/default"
+    local config="/etc/snapper/configs/root"
+
+    if [ ! -f /etc/snapper/configs/root ] && ! command -v snapper >/dev/null 2>&1; then
+        printf 'snapper is not installed; skipping root configuration\n' >&2
+        return 0
+    fi
+
+    if [ "$(findmnt -no FSTYPE / 2>/dev/null || true)" != "btrfs" ]; then
+        printf 'root is not on Btrfs; skipping Snapper configuration\n'
+        return 0
+    fi
+
+    if [ -f "${config}" ]; then
+        printf 'Snapper root configuration already exists\n'
+        return 0
+    fi
+
+    if snapper --no-dbus -c root create-config / >/dev/null 2>&1; then
+        printf 'Created Snapper root configuration\n'
+        return 0
+    fi
+
+    # The installed layout mounts the @snapshots subvolume at /.snapshots, and
+    # snapper refuses to create a configuration when .snapshots already exists.
+    # Seed the same configuration from the packaged template instead.
+    if [ ! -f "${template}" ]; then
+        printf 'snapper configuration template not found: %s\n' "${template}" >&2
+        return 0
+    fi
+
+    install -d -m 0755 /etc/snapper/configs
+    install -m 0640 "${template}" "${config}"
+    sed -i 's|^SUBVOLUME=.*|SUBVOLUME="/"|' "${config}"
+    printf 'Seeded Snapper root configuration for the @snapshots layout\n'
+}
+
+main "$@"
