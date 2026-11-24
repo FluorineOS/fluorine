@@ -5,5 +5,5 @@
 vt = 7
 
 [default_session]
-command = "tuigreet --time --remember --cmd start-hyprland"
+command = "/usr/local/bin/fluorineos-greeter"
 user = "_greetd"

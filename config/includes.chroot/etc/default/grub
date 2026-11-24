@@ -1,0 +1,25 @@
+# FluorineOS GRUB defaults.
+#
+# The primary kernel entry boots with "quiet splash" so Plymouth owns the whole
+# transition from firmware to the greeter. Recovery and safe-graphics entries
+# stay verbose: Debian's /etc/grub.d/10_linux builds those from
+# GRUB_CMDLINE_LINUX_RECOVERY and GRUB_CMDLINE_LINUX only, so they never inherit
+# the quiet splash pair above. Keep GRUB_CMDLINE_LINUX empty for that reason.
+
+GRUB_DEFAULT=0
+GRUB_TIMEOUT=3
+GRUB_TIMEOUT_STYLE=menu
+GRUB_DISTRIBUTOR="FluorineOS"
+
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
+GRUB_CMDLINE_LINUX=""
+GRUB_CMDLINE_LINUX_RECOVERY="recovery"
+
+GRUB_TERMINAL_OUTPUT="gfxterm"
+GRUB_GFXMODE=1920x1080,auto
+GRUB_GFXPAYLOAD_LINUX=keep
+
+GRUB_THEME="/boot/grub/themes/fluorine/theme.txt"
+
+GRUB_DISABLE_RECOVERY="false"
+GRUB_DISABLE_OS_PROBER="false"

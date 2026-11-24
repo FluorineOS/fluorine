@@ -1,0 +1,28 @@
+#!/bin/sh
+# FluorineOS greeter.
+#
+# greetd launches this on vt 7. It loads the AMOLED Void console palette so
+# tuigreet's ANSI color names resolve to our exact tokens, then hands the
+# terminal over to tuigreet without spawning an extra shell that would outlive
+# the greeter.
+set -eu
+
+if command -v setvtrgb >/dev/null 2>&1 && [ -r /etc/vtrgb ]; then
+    setvtrgb /etc/vtrgb || true
+fi
+
+# Theme component colors map onto /etc/vtrgb: border and action use darkgray
+# (#1C2229), title, greeting, input, and buttons use green (#B4F03A), body text
+# uses white (#E2E8F0), the container paints the black canvas, and the time is
+# muted darkgray.
+exec tuigreet \
+    --time \
+    --remember \
+    --asterisks \
+    --greeting "FluorineOS  //  sign in" \
+    --greet-align left \
+    --window-padding 2 \
+    --container-padding 2 \
+    --prompt-padding 1 \
+    --theme "border=darkgray;text=white;time=darkgray;container=black;title=green;greet=green;prompt=white;input=green;action=darkgray;button=green" \
+    --cmd start-hyprland

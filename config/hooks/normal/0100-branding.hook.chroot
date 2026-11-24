@@ -26,10 +26,21 @@ EOF
     chmod 0644 /etc/hostname
 
     if command -v plymouth-set-default-theme >/dev/null 2>&1 &&
-        [ -d /usr/share/plymouth/themes/fluorineos ]; then
-        plymouth-set-default-theme -R fluorineos
+        [ -d /usr/share/plymouth/themes/fluorine ]; then
+        plymouth-set-default-theme -R fluorine
     else
-        printf 'Plymouth theme fluorineos not available, skipping\n' >&2
+        printf 'Plymouth theme fluorine not available, skipping\n' >&2
+    fi
+
+    # GRUB can only read from the boot partition, so the packaged theme has to
+    # be staged under /boot before the menu is generated.
+    if [ -d /usr/share/grub/themes/fluorine ] && [ -d /boot/grub ]; then
+        mkdir -p /boot/grub/themes
+        rm -rf /boot/grub/themes/fluorine
+        cp -a /usr/share/grub/themes/fluorine /boot/grub/themes/fluorine
+        if command -v update-grub >/dev/null 2>&1; then
+            update-grub
+        fi
     fi
 }
 
