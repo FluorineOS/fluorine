@@ -156,6 +156,12 @@ normalize_modes() {
     if [[ -d "$build_dir/bin" ]]; then
         find "$build_dir/bin" -maxdepth 1 -type f -exec chmod 0755 {} +
     fi
+
+    # Build helpers under tools/ are run from debian/rules, so they need the
+    # executable bit even though the Windows checkout lost it.
+    if [[ -d "$build_dir/tools" ]]; then
+        find "$build_dir/tools" -maxdepth 1 -type f -name '*.sh' -exec chmod 0755 {} +
+    fi
 }
 
 build_package() {
