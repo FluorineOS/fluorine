@@ -1,3 +1,4 @@
+# shellcheck shell=sh
 # Start the Hyprland session on the live medium.
 #
 # The live medium autologins the live user on tty1 and skips greetd, so this
