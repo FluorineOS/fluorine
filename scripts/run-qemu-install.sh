@@ -10,8 +10,8 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(dirname -- "${SCRIPT_DIR}")
-DISK_IMAGE="${REPO_ROOT}/test-disk.qcow2"
-VARS_IMAGE="${REPO_ROOT}/test-vars.fd"
+DISK_IMAGE="${FLUORINEOS_DISK_IMAGE:-${REPO_ROOT}/test-disk.qcow2}"
+VARS_IMAGE="${FLUORINEOS_VARS_IMAGE:-${DISK_IMAGE%.qcow2}-vars.fd}"
 DISK_SIZE="25G"
 MEMORY=4096
 CPUS=4
@@ -28,8 +28,12 @@ Creates test-disk.qcow2 (25 GB) when missing and boots the ISO with UEFI
 firmware so Calamares can install onto it.
 
 Options:
-  --boot-disk   Boot from test-disk.qcow2 instead of the installer ISO.
+  --boot-disk   Boot from the installed disk instead of the installer ISO.
   -h, --help    Show this help.
+
+Environment:
+  FLUORINEOS_DISK_IMAGE   Disk to create or reuse (default test-disk.qcow2).
+  FLUORINEOS_VARS_IMAGE   UEFI variable store (default <disk>-vars.fd).
 EOF
 }
 
@@ -46,8 +50,8 @@ find_iso() {
     local candidate
 
     for candidate in \
-        "${REPO_ROOT}/FluorineOS-0.3.0-amd64.iso" \
-        "${REPO_ROOT}/FluorineOS-0.3.0-amd64.hybrid.iso" \
+        "${REPO_ROOT}/FluorineOS-0.4.0-amd64.iso" \
+        "${REPO_ROOT}/FluorineOS-0.4.0-amd64.hybrid.iso" \
         "${REPO_ROOT}/live-image-amd64.hybrid.iso"; do
         if [ -f "${candidate}" ]; then
             printf '%s\n' "${candidate}"

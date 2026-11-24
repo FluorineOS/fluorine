@@ -7,10 +7,10 @@ set -euo pipefail
 
 main() {
     cat > /etc/os-release <<'EOF'
-PRETTY_NAME="FluorineOS 0.3.0 (Trixie)"
+PRETTY_NAME="FluorineOS 0.4.0 (Trixie)"
 NAME="FluorineOS"
-VERSION="0.3.0"
-VERSION_ID="0.3.0"
+VERSION="0.4.0"
+VERSION_ID="0.4.0"
 ID=fluorineos
 ID_LIKE=debian
 HOME_URL="https://github.com/FluorineOS"
@@ -19,7 +19,7 @@ BUG_REPORT_URL="https://github.com/FluorineOS/fluorine/issues"
 EOF
     chmod 0644 /etc/os-release
 
-    printf '%s\n' 'FluorineOS 0.3.0 \n \l' > /etc/issue
+    printf '%s\n' 'FluorineOS 0.4.0 \n \l' > /etc/issue
     chmod 0644 /etc/issue
 
     printf '%s\n' 'fluorine' > /etc/hostname
