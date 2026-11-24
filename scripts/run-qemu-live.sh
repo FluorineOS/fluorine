@@ -10,7 +10,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(dirname -- "${SCRIPT_DIR}")
-WINDOWS_ISO_NAME="FluorineOS-0.2.0-amd64.iso"
+WINDOWS_ISO_NAME="FluorineOS-0.3.0-amd64.iso"
 MEMORY=4096
 CPUS=4
 SERIAL_SOCKET="${TMPDIR:-/tmp}/fluorineos-serial.sock"
@@ -52,8 +52,8 @@ find_iso() {
     local candidate
 
     for candidate in \
-        "${REPO_ROOT}/FluorineOS-0.2.0-amd64.iso" \
-        "${REPO_ROOT}/FluorineOS-0.2.0-amd64.hybrid.iso" \
+        "${REPO_ROOT}/FluorineOS-0.3.0-amd64.iso" \
+        "${REPO_ROOT}/FluorineOS-0.3.0-amd64.hybrid.iso" \
         "${REPO_ROOT}/live-image-amd64.hybrid.iso"; do
         if [ -f "${candidate}" ]; then
             printf '%s\n' "${candidate}"
