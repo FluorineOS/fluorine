@@ -10,7 +10,7 @@ Arguments: `$ARGUMENTS`
 ## Input contract
 
 Accept either `<number>-<name>` (for example `10-amdgpu`) or `<number> <name>` (for
-example `10 amdgpu`). The number is a zero-padded two-digit ordering prefix (`00`–`99`).
+example `10 amdgpu`). The number is a zero-padded two-digit ordering prefix (`00`-`99`).
 The name is lowercase kebab-case and must match `[a-z0-9]+(-[a-z0-9]+)*`.
 
 If the arguments are missing, ambiguous, or malformed, stop and ask the user. If the target
