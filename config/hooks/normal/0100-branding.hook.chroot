@@ -38,8 +38,14 @@ EOF
         mkdir -p /boot/grub/themes
         rm -rf /boot/grub/themes/fluorine
         cp -a /usr/share/grub/themes/fluorine /boot/grub/themes/fluorine
+        # The live image menu comes from config/bootloaders/grub-pc, and the
+        # installer rewrites the target GRUB config, so this regeneration only
+        # matters for a chroot that can see the build device. live-build mounts
+        # /proc, /sys, and /dev/pts but not /dev, so grub-probe legitimately
+        # cannot resolve / here; that must not abort the image build.
         if command -v update-grub >/dev/null 2>&1; then
-            update-grub
+            update-grub ||
+                printf 'update-grub skipped: no device for / in the build chroot\n' >&2
         fi
     fi
 }
