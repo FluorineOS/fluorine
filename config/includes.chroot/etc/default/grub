@@ -5,6 +5,11 @@
 # stay verbose: Debian's /etc/grub.d/10_linux builds those from
 # GRUB_CMDLINE_LINUX_RECOVERY and GRUB_CMDLINE_LINUX only, so they never inherit
 # the quiet splash pair above. Keep GRUB_CMDLINE_LINUX empty for that reason.
+#
+# This file is the authoritative source for the installed system's GRUB
+# configuration. The Calamares `grubcfg` module is deliberately not in the
+# sequence, because it would rewrite GRUB_CMDLINE_LINUX_DEFAULT and the
+# distributor string.
 
 GRUB_DEFAULT=0
 GRUB_TIMEOUT=3
@@ -22,4 +27,15 @@ GRUB_GFXPAYLOAD_LINUX=keep
 GRUB_THEME="/boot/grub/themes/fluorine/theme.txt"
 
 GRUB_DISABLE_RECOVERY="false"
+
+# Dual-boot is supported: os-prober is installed in the image (see
+# config/package-lists/installer.list.chroot) and GRUB is told to use it. Debian
+# 13 defaults to disabled, so this line is what makes the installed menu list
+# other operating systems instead of silently omitting them.
 GRUB_DISABLE_OS_PROBER="false"
+
+# Required for an encrypted root. grub-install reads this value and embeds the
+# cryptodisk/luks modules in the core image; without it GRUB starts, cannot read
+# the LUKS container that holds /boot, and the menu has no kernel to boot. It is
+# harmless on an unencrypted install.
+GRUB_ENABLE_CRYPTODISK=y
