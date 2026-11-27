@@ -178,6 +178,17 @@ for needle in "nvidia-driver" "Validation requirements" "mesa-vulkan-drivers"; d
     fi
 done
 
+# Backlight access is granted by brightness-udev through group membership, so
+# the installer has to place the user in the groups those rules target.
+USERS_CONF="${REPO}/config/includes.chroot/etc/calamares/modules/users.conf"
+for group in video input; do
+    if grep -qE "^[[:space:]]+- ${group}$" "${USERS_CONF}" 2>/dev/null; then
+        ok "installer places the user in group ${group}"
+    else
+        bad "installer does not place the user in group ${group}"
+    fi
+done
+
 # The image is amd64 only, so arm64-only firmware must stay out.
 if has_package firmware-qcom-soc; then
     bad "arm64-only firmware-qcom-soc is in the amd64 package list"
