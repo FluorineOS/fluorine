@@ -75,18 +75,39 @@ Default shortcuts are bound in `~/.config/hypr/hyprland.lua`:
 | `SUPER + Return` | Launch Kitty terminal emulator |
 | `SUPER + D` | Launch Fuzzel application launcher |
 | `SUPER + E` | Launch Thunar file manager |
+| `SUPER + S` | Open the application hub (`flr-store`) |
 | `SUPER + Q` | Close active window |
 | `SUPER + V` | Toggle floating mode on active window |
 | `SUPER + F` | Toggle fullscreen mode on active window |
+| `SUPER + C` | Pick an entry from clipboard history |
 | `SUPER + Shift + S` | Interactive area screenshot (`flr-shot`) |
+| `SUPER + Shift + N` | Cycle the display shader off, night, mono |
+| `SUPER + W` | Open the wallpaper picker (`flr-wall`) |
 | `SUPER + /` | Display keybinding reference dialog (`flr-keys`) |
+| `SUPER + Escape` | Open the system menu (`flr-ctl`) |
+| `SUPER + comma` | Open the settings panel (`flr-settings`) |
+| `SUPER + M` | Open the workstation mode picker (`flr-mode`) |
 | `SUPER + L` | Lock workstation screen (`hyprlock`) |
 | `SUPER + Arrow keys` | Move focus in that direction |
-| `SUPER + H J K L` | Move focus left, down, up, right |
+| `SUPER + H` / `J` / `K` / `;` | Move focus left, down, up, right |
 | `SUPER + 1..9` | Switch to workspace 1 through 9 |
+| `SUPER + 0` | Switch to workspace 10 |
 | `SUPER + Shift + 1..9` | Move active window to workspace 1 through 9 |
+| `SUPER + Tab` / `SUPER + Shift + Tab` | Cycle forward or backward through the windows on the workspace |
+| `SUPER + Shift + Arrow keys` | Swap the active window with its neighbour |
+| `SUPER + Alt + Arrow keys` | Resize the active window by 40 pixels |
+| `SUPER + P` | Toggle pseudo-tiling for the active window |
+| `SUPER + T` | Flip the dwindle split axis |
+| `SUPER + N` | Open the notification centre |
+| `SUPER + Scroll` | Walk the existing workspaces |
+| `SUPER + Left-drag` / `SUPER + Right-drag` | Move or resize the active window with the pointer |
+| `Print` | Capture the whole screen |
 
 ## Installation
+
+On the live desktop, `SUPER + Escape` opens the system menu and `Install FluorineOS`
+is its first entry; the same menu item never appears on an installed system. The
+installer shortcut on `~/Desktop` is kept for file-manager users.
 
 ### Hardware Requirements
 
@@ -165,9 +186,9 @@ sudo ./auto/config
 sudo ./auto/build
 ```
 
-The image is written to `FluorineOS-0.2.0-amd64.hybrid.iso`. Set `FLUORINE_VERSION` to
-build a different version label, and run `sudo ./auto/clean` to reset the tree while
-keeping the bootstrap cache.
+The image is written under `binary/` with the version label from `VERSION`. Set
+`FLUORINE_VERSION` to build a different version label, and run `sudo ./auto/clean` to
+reset the tree while keeping the bootstrap cache.
 
 ## License
 
