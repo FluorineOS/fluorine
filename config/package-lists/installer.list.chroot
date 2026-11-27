@@ -11,3 +11,9 @@ cryptsetup
 btrfs-progs
 dosfstools
 e2fsprogs
+
+# Dual-boot support. /etc/default/grub sets GRUB_DISABLE_OS_PROBER="false", and
+# Debian 13's grub-mkconfig prints "os-prober will not be executed" without this
+# package, producing a menu with no other operating systems while the
+# configuration asks for the opposite.
+os-prober

@@ -27,3 +27,15 @@ fastfetch
 fonts-jetbrains-mono
 fonts-inter
 fonts-noto-color-emoji
+
+# Installer runtime dependencies, declared rather than inherited transitively.
+#   locales              localecfg runs locale-gen for the chosen locale and is
+#                        fatal on failure.
+#   keyboard-configuration
+#                        provides the console keymap handling that reads
+#                        /etc/default/keyboard, which the keyboard module writes.
+#   initramfs-tools      the initramfs module runs update-initramfs to give an
+#                        encrypted install an image that can unlock its root.
+locales
+keyboard-configuration
+initramfs-tools
