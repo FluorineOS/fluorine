@@ -87,11 +87,20 @@ and `~/.config/hypr/hyprland.lua` documents the `1.25` and `1.5` variants.
 | Idle policy | `hypridle` | Dim at 5 min, lock at 10 min, suspend at 20 min on battery |
 | Suspend and resume | `systemd-logind` | Lock before sleep, DPMS on after resume |
 | Lid | `systemd-logind` default policy | Close suspends, open resumes |
-| Panel brightness | `brightnessctl`, `brightness-udev`, `flr-osd` | Keys bound in `hyprland.lua` |
-| Keyboard backlight | `brightnessctl` over `/sys/class/leds/*::kbd_backlight` | Keys bound in `hyprland.lua` |
+| Panel brightness | `brightnessctl`, `brightness-udev`, `flr-osd` | Keys bound in `hyprland.lua`, needs group `video` |
+| Keyboard backlight | `brightnessctl` over `/sys/class/leds/*::kbd_backlight` | Keys bound in `hyprland.lua`, needs group `input` |
 | Touchpad | `libinput` through the Hyprland `input` block | Tap to click, natural scroll, palm rejection |
 | Touchscreen | `libinput` | Works as a pointer device, no gesture mapping |
 | Thermal | Kernel `thermal` and `acpi_thermal_rel` | No userspace daemon |
+
+Backlight access is group based. A sysfs attribute cannot carry an ACL, and
+udev permission keys only apply to device nodes under `/dev`, so a `uaccess`
+tag does nothing for `/sys/class/backlight`. `brightness-udev` handles it the
+only way that works: a udev rule that makes the sysfs file group writable,
+with `video` for the panel and `input` for the LEDs. The installer therefore
+places the user in both groups (`defaultGroups` in the Calamares
+`users.conf`), and `flr-doctor` reports a backlight that exists but is not
+writable instead of leaving the keys silently dead.
 
 `thermald` is not installed. It only applies to Intel CPUs, it duplicates work
 the kernel thermal governor already does, and on several platforms it fights
