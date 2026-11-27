@@ -1,3 +1,14 @@
 *.sh text eol=lf
 auto/* text eol=lf
 *.hook.chroot text eol=lf
+
+# Installer payload and validation sources must stay LF. With core.autocrlf=true
+# a CRLF checkout puts \r into a shebang, a package list entry, or a Calamares
+# KEY=value, none of which reports a useful error: the hook exits 126, apt fails
+# to resolve a package name, or the installer reads a corrupt value.
+config/includes.chroot/** text eol=lf
+config/package-lists/** text eol=lf
+config/hooks/** text eol=lf
+config/bootloaders/** text eol=lf
+tests/** text eol=lf
+docs/** text eol=lf
