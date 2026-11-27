@@ -21,6 +21,18 @@ main() {
     enable_unit greetd.service
     enable_unit ufw.service
 
+    # power-profiles-daemon backs flr-power, the Waybar power module, and the
+    # flr-ctl power entry. Debian's package enables it, and enabling it here
+    # keeps the guarantee explicit.
+    enable_unit power-profiles-daemon.service
+
+    # Printing. CUPS is socket activated, so enabling the service alone does
+    # not keep a daemon resident until something prints. avahi-daemon is what
+    # makes driverless network printers discoverable over mDNS, and it is also
+    # what resolves the .local names printers advertise.
+    enable_unit cups.service
+    enable_unit avahi-daemon.service
+
     if command -v ufw >/dev/null 2>&1; then
         ufw default deny incoming
         ufw default allow outgoing
