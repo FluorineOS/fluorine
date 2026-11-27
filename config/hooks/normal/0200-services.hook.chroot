@@ -15,6 +15,19 @@ enable_unit() {
     fi
 }
 
+# --root=/ keeps the operation purely filesystem level: no running systemd is
+# needed in the build chroot, and the symlinks are removed from the image's own
+# /etc/systemd/system.
+disable_unit() {
+    local unit="$1"
+
+    if systemctl --root=/ disable --quiet "${unit}" >/dev/null 2>&1; then
+        printf 'Disabled %s\n' "${unit}"
+    else
+        printf 'Left %s as packaged: unit not present in this chroot\n' "${unit}" >&2
+    fi
+}
+
 main() {
     enable_unit NetworkManager.service
     enable_unit bluetooth.service
@@ -26,11 +39,27 @@ main() {
     # keeps the guarantee explicit.
     enable_unit power-profiles-daemon.service
 
-    # Printing. CUPS is socket activated, so enabling the service alone does
-    # not keep a daemon resident until something prints. avahi-daemon is what
-    # makes driverless network printers discoverable over mDNS, and it is also
-    # what resolves the .local names printers advertise.
-    enable_unit cups.service
+    # Printing, on demand.
+    #
+    # cups-daemon enables cups.service, cups.socket, and cups.path, and
+    # cups.service is WantedBy=multi-user.target, so the packaged default keeps
+    # cupsd resident from boot even when nothing ever prints. The socket is the
+    # supported alternative: a print dialog, lpstat, or cups-pk-helper connects
+    # to /run/cups/cups.sock and systemd starts cupsd for that request.
+    #
+    # cups.path has to go as well, or the change undoes itself: it watches for
+    # /var/cache/cups/org.cups.cupsd, a file cupsd itself writes once it has
+    # run, so after the first print it would start cupsd at every boot.
+    #
+    # Disabling cups.service also disables cups.socket and cups.path through the
+    # unit's Also=, so the socket is enabled again afterwards. A cups upgrade
+    # may re-enable the packaged default; docs/PERFORMANCE.md records the check.
+    disable_unit cups.service
+    disable_unit cups.path
+    enable_unit cups.socket
+
+    # avahi-daemon is what makes driverless network printers discoverable over
+    # mDNS, and it is also what resolves the .local names printers advertise.
     enable_unit avahi-daemon.service
 
     if command -v ufw >/dev/null 2>&1; then
