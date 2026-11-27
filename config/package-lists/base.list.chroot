@@ -1,15 +1,12 @@
 linux-image-amd64
-firmware-linux
-firmware-iwlwifi
-firmware-realtek
 systemd-sysv
 network-manager
 bluez
 blueman
-pipewire
-pipewire-pulse
-wireplumber
-libspa-0.2-bluetooth
+# The audio metapackage pulls pipewire, pipewire-pulse, pipewire-alsa,
+# libspa-0.2-bluetooth, and wireplumber at versions that belong together.
+# Firmware, microcode, and device integration live in hardware.list.chroot.
+pipewire-audio
 ufw
 zram-tools
 curl

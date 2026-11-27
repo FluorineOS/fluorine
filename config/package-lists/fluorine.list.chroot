@@ -2,18 +2,13 @@ fluorine-desktop
 fluorine-artwork
 fluorine-keyring
 
-# Bare-metal hardware support: firmware blobs, CPU microcode, and the initramfs
-# hooks that unlock a LUKS2 root volume.
-firmware-linux-free
-firmware-linux-nonfree
-firmware-iwlwifi
-firmware-realtek
-firmware-atheros
-intel-microcode
-amd64-microcode
+# LUKS2 root unlocking in the initramfs; the crypttab and initramfs modules
+# ask for it. Firmware, microcode, and the rest of the device support live in
+# hardware.list.chroot.
 cryptsetup-initramfs
 
-# Btrfs root filesystem and snapshot management. The installer creates @, @home,
-# and @snapshots subvolumes, and flr-snapshot drives snapper from the desktop.
-btrfs-progs
+# Btrfs snapshot management. The installer creates the @, @home, and @snapshots
+# subvolumes and flr-snapshot drives snapper from the desktop. btrfs-progs
+# itself is declared with the installer filesystem tools, since both lists are
+# part of the same image and duplicating it here only obscures ownership.
 snapper
