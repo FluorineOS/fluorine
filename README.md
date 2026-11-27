@@ -100,8 +100,11 @@ Default shortcuts are bound in `~/.config/hypr/hyprland.lua`:
 | `SUPER + T` | Flip the dwindle split axis |
 | `SUPER + N` | Open the notification centre |
 | `SUPER + Scroll` | Walk the existing workspaces |
+| `Keyboard brightness keys` | Raise or lower the keyboard backlight |
 | `SUPER + Left-drag` / `SUPER + Right-drag` | Move or resize the active window with the pointer |
 | `Print` | Capture the whole screen |
+| `Volume keys` / `Mute` | Change the default sink and show the on-screen display |
+| `Panel brightness keys` | Raise or lower the panel backlight |
 
 ## Installation
 
