@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=Install FluorineOS 0.2.0
+Name=Install FluorineOS
 Comment=Install FluorineOS on this computer
-Exec=sudo -E calamares
+Exec=sudo calamares
 Icon=calamares
 Terminal=false
 Categories=System;

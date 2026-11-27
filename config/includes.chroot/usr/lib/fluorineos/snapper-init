@@ -1,48 +1,258 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Initialize a Snapper root configuration on an installed Btrfs system.
+# Initialize, repair, or verify the Snapper root configuration on an installed
+# Btrfs system.
 #
-# Calamares runs this inside the target chroot through the shellprocess module,
-# after the packages step has installed snapper and btrfs-progs. It is
-# idempotent, so running it again on an existing system only verifies state.
+# Invoked by the Calamares shellprocess module as
+#   chroot "${ROOT}" bash /usr/lib/fluorineos/snapper-init \
+#       --root-fstype "$(stat -f -c %T "${ROOT}")"
+#
+# Why the filesystem type is passed in
+# ------------------------------------
+# `findmnt -no FSTYPE /` resolves the path against /proc/self/mountinfo, whose
+# mount points are relative to the real root, not to the chroot. Inside the
+# Calamares chroot that reports the live overlay, so a version of this script
+# that only used findmnt skipped Snapper on every real installation while
+# returning success, and the installer reported a clean install with no
+# /etc/snapper/configs/root.
+#
+# The caller therefore measures the type of the mounted target before entering
+# the chroot. The script can also measure it itself: statfs on the chroot root
+# acts on the target's superblock and is namespace independent, which is what
+# makes a manual run on an installed system work. findmnt remains only as a last
+# resort.
+#
+# Exit status
+# -----------
+#   0  configured and verified, or deliberately not applicable (not Btrfs)
+#   1  Btrfs, but Snapper is missing or its configuration could not be created
+#      or verified. The installer must fail here rather than report success: a
+#      missing configuration silently disables pre-update snapshots.
 
-main() {
-    local template="/usr/share/snapper/config-templates/default"
-    local config="/etc/snapper/configs/root"
+readonly DEFAULT_TEMPLATE=/usr/share/snapper/config-templates/default
+readonly LOG_RELATIVE=var/log/fluorineos-install/snapper.log
 
-    if [ ! -f /etc/snapper/configs/root ] && ! command -v snapper >/dev/null 2>&1; then
-        printf 'snapper is not installed; skipping root configuration\n' >&2
+root_prefix=""
+root_fstype=""
+log_file=""
+
+log() {
+    printf '%s\n' "$*"
+    if [ -n "${log_file}" ]; then
+        install -d -m 0750 -- "$(dirname -- "${log_file}")"
+        printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >> "${log_file}"
+    fi
+}
+
+die() {
+    printf 'snapper-init: %s\n' "$*" >&2
+    log "ERROR: $*"
+    exit 1
+}
+
+usage() {
+    cat <<'EOF'
+Usage: snapper-init [--root-fstype TYPE] [--root DIR]
+
+  --root-fstype TYPE  Filesystem type of the root to configure. The installer
+                      passes the type of the mounted target, measured outside
+                      the chroot.
+  --root DIR          Treat DIR as the filesystem root. Test seam only; the
+                      installer always configures /.
+EOF
+}
+
+parse_args() {
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --root-fstype)
+                [ "$#" -ge 2 ] || die "--root-fstype requires an argument"
+                root_fstype=$2
+                shift 2
+                ;;
+            --root-fstype=*)
+                root_fstype=${1#*=}
+                shift
+                ;;
+            --root)
+                [ "$#" -ge 2 ] || die "--root requires an argument"
+                root_prefix=${2%/}
+                shift 2
+                ;;
+            --root=*)
+                root_prefix=${1#*=}
+                root_prefix=${root_prefix%/}
+                shift
+                ;;
+            -h | --help)
+                usage
+                exit 0
+                ;;
+            *)
+                usage >&2
+                die "unknown argument: $1"
+                ;;
+        esac
+    done
+
+    if [ -n "${root_prefix}" ] && [ ! -d "${root_prefix}" ]; then
+        die "root prefix is not a directory: ${root_prefix}"
+    fi
+}
+
+# Filesystem type of the root being configured.
+detect_fstype() {
+    local detected=""
+
+    if [ -n "${root_fstype}" ]; then
+        printf '%s\n' "${root_fstype}"
         return 0
     fi
 
-    if [ "$(findmnt -no FSTYPE / 2>/dev/null || true)" != "btrfs" ]; then
-        printf 'root is not on Btrfs; skipping Snapper configuration\n'
+    if detected=$(stat -f -c %T "${root_prefix}/" 2>/dev/null); then
+        if [ -n "${detected}" ]; then
+            printf '%s\n' "${detected}"
+            return 0
+        fi
+    fi
+
+    findmnt -no FSTYPE "${root_prefix}/" 2>/dev/null || true
+}
+
+# True when /.snapshots is a separate mount (the @snapshots subvolume) rather
+# than a plain directory inside the root subvolume.
+snapshots_is_separate_mount() {
+    local root_dev="" snapshots_dev=""
+
+    root_dev=$(stat -c %d "${root_prefix}/" 2>/dev/null) || return 1
+    snapshots_dev=$(stat -c %d "${root_prefix}/.snapshots" 2>/dev/null) || return 1
+    [ "${root_dev}" != "${snapshots_dev}" ]
+}
+
+ensure_snapshots_dir() {
+    local snapshots="${root_prefix}/.snapshots"
+
+    if [ ! -d "${snapshots}" ]; then
+        install -d -m 0750 "${snapshots}" ||
+            die "cannot create ${snapshots}"
+        log "created a missing /.snapshots directory"
         return 0
     fi
+
+    if ! snapshots_is_separate_mount; then
+        # Snapper still works, but snapshots land inside the root subvolume,
+        # which means a rollback of / also moves the snapshot store and snapshot
+        # writes churn every later snapshot. Report it instead of hiding it.
+        log "WARNING: /.snapshots is not a separate subvolume mount; snapshot storage is inside /"
+    fi
+}
+
+set_key() {
+    local file=$1
+    local key=$2
+    local value=$3
+
+    if grep -q "^${key}=" "${file}"; then
+        sed -i "s|^${key}=.*|${key}=\"${value}\"|" "${file}"
+    else
+        printf '%s="%s"\n' "${key}" "${value}" >> "${file}"
+    fi
+}
+
+# Pin the values FluorineOS depends on, whatever the template or a previous
+# installation left behind.
+normalize_config() {
+    local config=$1
+
+    set_key "${config}" SUBVOLUME "/"
+    # The templates enable hourly timeline snapshots. On a desktop that grows
+    # without bound and competes with the pre-update snapshots flr-update
+    # creates, so timeline snapshots are off and manual snapshots are the only
+    # source.
+    set_key "${config}" TIMELINE_CREATE "no"
+    set_key "${config}" TIMELINE_CLEANUP "yes"
+    set_key "${config}" ALLOW_USERS ""
+    set_key "${config}" ALLOW_GROUPS ""
+    chmod 0640 "${config}"
+}
+
+validate_config() {
+    local config=$1
+
+    [ -f "${config}" ] || return 1
+    grep -Eq '^SUBVOLUME="/"' "${config}" || return 1
+    grep -Eq '^TIMELINE_CREATE="no"' "${config}" || return 1
+    command -v snapper >/dev/null 2>&1 || return 1
+    # The only check that proves Snapper can actually use the configuration: it
+    # opens the subvolume, reads /.snapshots and enumerates snapshots.
+    snapper --no-dbus -c root list >/dev/null 2>&1 || return 1
+}
+
+seed_from_template() {
+    local config=$1
+    local template="${root_prefix}${DEFAULT_TEMPLATE}"
+
+    [ -f "${template}" ] || return 1
+    install -d -m 0755 -- "$(dirname -- "${config}")" || return 1
+    install -m 0640 -- "${template}" "${config}" || return 1
+}
+
+create_or_repair() {
+    local config="${root_prefix}/etc/snapper/configs/root"
 
     if [ -f "${config}" ]; then
-        printf 'Snapper root configuration already exists\n'
+        log "found an existing Snapper root configuration"
+        normalize_config "${config}"
+        if validate_config "${config}"; then
+            log "existing Snapper root configuration verified"
+            return 0
+        fi
+        die "the existing Snapper root configuration does not work; refusing to report success"
+    fi
+
+    # snapper create-config refuses when /.snapshots already exists, which is
+    # the normal case for this layout because @snapshots is mounted there. Seed
+    # the packaged template in that case: it is the same configuration
+    # create-config would have written.
+    if snapper --no-dbus -c root create-config "${root_prefix}/" >/dev/null 2>&1; then
+        log "created the Snapper root configuration with snapper create-config"
+    elif seed_from_template "${config}"; then
+        log "seeded the Snapper root configuration from ${DEFAULT_TEMPLATE}"
+    else
+        die "cannot create or seed /etc/snapper/configs/root"
+    fi
+
+    normalize_config "${config}"
+    validate_config "${config}" ||
+        die "the new Snapper root configuration does not work"
+    log "created and verified the Snapper root configuration"
+}
+
+main() {
+    local fstype=""
+
+    parse_args "$@"
+    log_file="${root_prefix}/${LOG_RELATIVE}"
+
+    fstype=$(detect_fstype)
+    if [ "${fstype}" != "btrfs" ]; then
+        # Deliberate, documented non-applicability: Snapper has nothing to
+        # configure on a non-Btrfs root, and that is not an install failure.
+        log "root filesystem is '${fstype:-unknown}', not btrfs; Snapper does not apply"
         return 0
     fi
 
-    if snapper --no-dbus -c root create-config / >/dev/null 2>&1; then
-        printf 'Created Snapper root configuration\n'
-        return 0
+    if ! command -v snapper >/dev/null 2>&1; then
+        die "snapper is not installed in the target, but the root filesystem is btrfs"
+    fi
+    if [ ! -f "${root_prefix}${DEFAULT_TEMPLATE}" ]; then
+        log "WARNING: ${DEFAULT_TEMPLATE} is missing; only snapper create-config can succeed"
     fi
 
-    # The installed layout mounts the @snapshots subvolume at /.snapshots, and
-    # snapper refuses to create a configuration when .snapshots already exists.
-    # Seed the same configuration from the packaged template instead.
-    if [ ! -f "${template}" ]; then
-        printf 'snapper configuration template not found: %s\n' "${template}" >&2
-        return 0
-    fi
-
-    install -d -m 0755 /etc/snapper/configs
-    install -m 0640 "${template}" "${config}"
-    sed -i 's|^SUBVOLUME=.*|SUBVOLUME="/"|' "${config}"
-    printf 'Seeded Snapper root configuration for the @snapshots layout\n'
+    ensure_snapshots_dir
+    create_or_repair
+    log "Snapper root configuration is ready"
 }
 
 main "$@"

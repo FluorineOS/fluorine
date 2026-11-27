@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Copy the Calamares session log from the live session into the installed
+# system, so a failed or successful installation leaves something to read
+# afterwards.
+#
+# Invoked by the Calamares shellprocess module:
+#   bash /usr/lib/fluorineos/installer-log-preserve "${ROOT}"
+#
+# Calamares writes its log to the cache directory of the user it runs as. This
+# runs as root through sudo, so the live path is /root/.cache/Calamares/ or
+# /root/.cache/calamares/ depending on the packaged version, and a user-started
+# installer would write under /home/<user>/.cache/. All of them are searched, and
+# the newest readable file wins, so no hardcoded path has to be correct.
+#
+# The target copy is /var/log/fluorineos-install/session.log. /var/log is its own
+# Btrfs subvolume (see partition.conf), so the log survives a rollback of /.
+#
+# Calamares does not log passphrases or user passwords, but the copy is filtered
+# anyway: any "password:" or "passphrase=" value is replaced, so a future module
+# that echoes one cannot put it on the installed disk.
+#
+# A missing log is not an install failure. It is recorded as a note in the target
+# so the absence itself is diagnosable.
+
+target_root=""
+source_dir=""
+
+usage() {
+    cat <<'EOF'
+Usage: installer-log-preserve TARGET_ROOT [--source DIR]
+
+  TARGET_ROOT    Mounted root of the installed system.
+  --source DIR   Search DIR for the session log instead of the live session's
+                 cache directories. Test seam.
+EOF
+}
+
+die() {
+    printf 'installer-log-preserve: %s\n' "$*" >&2
+    exit 1
+}
+
+parse_args() {
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --source)
+                [ "$#" -ge 2 ] || die "--source requires an argument"
+                source_dir=${2%/}
+                shift 2
+                ;;
+            --source=*)
+                source_dir=${1#*=}
+                source_dir=${source_dir%/}
+                shift
+                ;;
+            -h | --help)
+                usage
+                exit 0
+                ;;
+            -*) die "unknown argument: $1" ;;
+            *)
+                [ -z "${target_root}" ] || die "unexpected extra argument: $1"
+                target_root=${1%/}
+                shift
+                ;;
+        esac
+    done
+
+    [ -n "${target_root}" ] || die "TARGET_ROOT is required"
+    [ -d "${target_root}" ] || die "target root is not a directory: ${target_root}"
+}
+
+search_roots() {
+    local home=""
+
+    if [ -n "${source_dir}" ]; then
+        printf '%s\n' "${source_dir}"
+        return 0
+    fi
+
+    printf '%s\n' /root
+    for home in /home/*; do
+        [ -d "${home}" ] || continue
+        printf '%s\n' "${home}"
+    done
+}
+
+collect_candidates() {
+    local root=""
+    local name=""
+
+    while IFS= read -r root; do
+        for name in session.log .cache/calamares/session.log .cache/Calamares/session.log; do
+            if [ -f "${root}/${name}" ]; then
+                printf '%s\n' "${root}/${name}"
+            fi
+        done
+    done <<EOF
+$(search_roots)
+EOF
+
+    if [ -z "${source_dir}" ]; then
+        for name in /var/log/calamares/*.log; do
+            [ -f "${name}" ] && printf '%s\n' "${name}"
+        done
+    fi
+}
+
+newest_candidate() {
+    local candidate=""
+    local newest=""
+    local newest_mtime=0
+    local mtime=0
+
+    while IFS= read -r candidate; do
+        if [ ! -f "${candidate}" ] || [ ! -r "${candidate}" ]; then
+            continue
+        fi
+        mtime=$(stat -c %Y -- "${candidate}" 2>/dev/null) || continue
+        if [ "${mtime}" -ge "${newest_mtime}" ]; then
+            newest=${candidate}
+            newest_mtime=${mtime}
+        fi
+    done <<EOF
+$(collect_candidates)
+EOF
+
+    printf '%s\n' "${newest}"
+}
+
+fix_owner() {
+    local path=$1
+
+    if [ "$(id -u)" -eq 0 ]; then
+        chown 0:0 -- "${path}" 2>/dev/null || true
+    fi
+}
+
+create_note() {
+    local path=$1
+    local text=$2
+
+    printf '%s\n' "${text}" > "${path}.tmp"
+    chmod 0640 "${path}.tmp"
+    fix_owner "${path}.tmp"
+    mv -f -- "${path}.tmp" "${path}"
+}
+
+main() {
+    local dest_dir=""
+    local source_log=""
+    local bytes=0
+
+    parse_args "$@"
+
+    dest_dir="${target_root}/var/log/fluorineos-install"
+    install -d -m 0750 -- "${dest_dir}" ||
+        die "cannot create ${dest_dir}"
+    fix_owner "${dest_dir}"
+
+    source_log=$(newest_candidate)
+
+    if [ -n "${source_log}" ]; then
+        # Redact any credential-looking value before it reaches the target disk.
+        sed -E 's/(pass(word|phrase)[[:space:]]*[:=][[:space:]]*)[^[:space:]]+/\1[REDACTED]/Ig' \
+            -- "${source_log}" > "${dest_dir}/session.log.tmp" ||
+            die "cannot read ${source_log}"
+        chmod 0640 "${dest_dir}/session.log.tmp"
+        fix_owner "${dest_dir}/session.log.tmp"
+        mv -f -- "${dest_dir}/session.log.tmp" "${dest_dir}/session.log"
+        bytes=$(stat -c %s -- "${dest_dir}/session.log")
+        printf 'Preserved the Calamares session log.\n\nsource: %s\nbytes: %s\ntimestamp: %s\n' \
+            "${source_log}" "${bytes}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > "${dest_dir}/install-context.txt.tmp"
+        chmod 0640 "${dest_dir}/install-context.txt.tmp"
+        fix_owner "${dest_dir}/install-context.txt.tmp"
+        mv -f -- "${dest_dir}/install-context.txt.tmp" "${dest_dir}/install-context.txt"
+        printf 'installer-log-preserve: copied %s to %s\n' \
+            "${source_log}" "${dest_dir}/session.log"
+        return 0
+    fi
+
+    create_note "${dest_dir}/session.log" \
+        "No Calamares session log was found in the live session, so this installation has no preserved log."
+    create_note "${dest_dir}/install-context.txt" \
+        "No session log was found. Searched the root and user cache directories for session.log.
+timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf 'installer-log-preserve: no session log found; recorded the absence in %s\n' \
+        "${dest_dir}" >&2
+}
+
+main "$@"

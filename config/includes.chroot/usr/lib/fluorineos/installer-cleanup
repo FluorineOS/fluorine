@@ -1,0 +1,192 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Remove live-session and Debian-installer residue from an installed system.
+#
+# Invoked by the Calamares shellprocess module:
+#   chroot "${ROOT}" bash /usr/lib/fluorineos/installer-cleanup --installed-target
+#
+# The --installed-target flag is required. A direct run on the live session
+# would delete the live sudoers rule and the live /etc/calamares tree, which
+# would strand the installer mid-run, so the flag is the explicit statement that
+# the filesystem being cleaned belongs to a target installation. --root DIR is a
+# test seam that runs the same code against a fixture tree.
+#
+# Every path is a literal installer path. Nothing here enumerates a directory
+# and deletes its contents, and the only glob is the desktop shortcut in user
+# home directories, which is matched by exact file name.
+#
+# Idempotent: a second run finds nothing to remove and exits 0.
+
+log_dir=""
+log_file=""
+root_prefix=""
+confirmed=0
+removed=0
+absent=0
+failed=0
+
+readonly REQUIRED_FILES=(
+    /etc/sudoers.d/99-fluorine-live-installer
+    /etc/xdg/autostart/calamares-desktop-icon.desktop
+    /etc/skel/Desktop/install-fluorineos.desktop
+)
+
+# Residue that only exists if a Debian Calamares package left files behind. A
+# missing path is normal and never an error.
+readonly OPTIONAL_PATHS=(
+    /usr/share/applications/calamares-install-debian.desktop
+    /usr/share/applications/install-debian.desktop
+    /usr/share/pixmaps/install-debian.png
+    /usr/share/pixmaps/install-debian.xpm
+    /etc/calamares
+    /usr/share/calamares/branding/debian
+    /usr/lib/calamares/modules/bootloader-config
+    /usr/lib/calamares/modules/sources-final
+    /usr/lib/calamares/modules/sources-media
+    /usr/lib/calamares/modules/dpkg-unsafe-io
+    /usr/lib/calamares/modules/dpkg-unsafe-io.schema.yaml
+)
+
+log() {
+    printf '%s\n' "$*"
+    if [ -n "${log_file}" ]; then
+        printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >> "${log_file}"
+    fi
+}
+
+die() {
+    printf 'installer-cleanup: %s\n' "$*" >&2
+    log "ERROR: $*"
+    exit 1
+}
+
+usage() {
+    cat <<'EOF'
+Usage: installer-cleanup --installed-target
+       installer-cleanup --root DIR
+
+  --installed-target  Clean the filesystem this script is running on. The
+                      installer uses this from inside the target chroot.
+  --root DIR          Clean DIR as if it were the installed root. Test seam.
+EOF
+}
+
+parse_args() {
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --installed-target)
+                confirmed=1
+                shift
+                ;;
+            --root)
+                [ "$#" -ge 2 ] || die "--root requires an argument"
+                root_prefix=${2%/}
+                confirmed=1
+                shift 2
+                ;;
+            --root=*)
+                root_prefix=${1#*=}
+                root_prefix=${root_prefix%/}
+                confirmed=1
+                shift
+                ;;
+            -h | --help)
+                usage
+                exit 0
+                ;;
+            *)
+                usage >&2
+                die "unknown argument: $1"
+                ;;
+        esac
+    done
+
+    if [ "${confirmed}" -eq 0 ]; then
+        usage >&2
+        die "refusing to run without --installed-target: this script removes installer files"
+    fi
+    if [ -n "${root_prefix}" ] && [ ! -d "${root_prefix}/etc" ]; then
+        die "not an installation root: ${root_prefix}"
+    fi
+}
+
+remove_path() {
+    local path=$1
+    local full="${root_prefix}${path}"
+
+    if [ ! -e "${full}" ] && [ ! -L "${full}" ]; then
+        absent=$((absent + 1))
+        log "absent  ${path}"
+        return 0
+    fi
+
+    if rm -rf -- "${full}"; then
+        removed=$((removed + 1))
+        log "removed ${path}"
+        return 0
+    fi
+
+    log "FAILED  ${path}"
+    return 1
+}
+
+remove_home_shortcuts() {
+    local shortcut=""
+    local found=0
+
+    for shortcut in "${root_prefix}"/home/*/Desktop/install-fluorineos.desktop; do
+        [ -e "${shortcut}" ] || continue
+        found=1
+        if rm -f -- "${shortcut}"; then
+            removed=$((removed + 1))
+            log "removed ${shortcut#"${root_prefix}"}"
+        else
+            log "FAILED  ${shortcut#"${root_prefix}"}"
+            return 1
+        fi
+    done
+
+    if [ "${found}" -eq 0 ]; then
+        absent=$((absent + 1))
+        log "absent  /home/*/Desktop/install-fluorineos.desktop"
+    fi
+}
+
+main() {
+    local path=""
+
+    parse_args "$@"
+
+    log_dir="${root_prefix}/var/log/fluorineos-install"
+    install -d -m 0750 -- "${log_dir}" || die "cannot create ${log_dir}"
+    log_file="${log_dir}/cleanup.log"
+
+    log "cleaning installer residue from ${root_prefix:-/}"
+
+    for path in "${REQUIRED_FILES[@]}"; do
+        remove_path "${path}" || {
+            failed=$((failed + 1))
+            log "REQUIRED ${path} could not be removed"
+        }
+    done
+    remove_home_shortcuts || {
+        failed=$((failed + 1))
+        log "a user desktop shortcut could not be removed"
+    }
+
+    # Residue from the Debian packaging is best-effort: it cannot affect boot,
+    # so a failure is recorded but does not fail the installation.
+    for path in "${OPTIONAL_PATHS[@]}"; do
+        remove_path "${path}" ||
+            log "WARNING: ${path} could not be removed; it is not required for boot"
+    done
+
+    log "summary: ${removed} removed, ${absent} absent, ${failed} failed"
+
+    if [ "${failed}" -ne 0 ]; then
+        die "${failed} required installer path(s) could not be removed"
+    fi
+}
+
+main "$@"

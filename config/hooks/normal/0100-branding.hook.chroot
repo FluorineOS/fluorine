@@ -3,9 +3,18 @@ set -euo pipefail
 
 # Hook: 0100-branding
 # Runs inside the live-build chroot as root during the normal hook phase.
-# Owns the distribution identity files and the default hostname.
+# Owns the distribution identity files, the default hostname, and the matching
+# local hostname resolution entry.
 
 main() {
+    write_os_release
+    write_hostname
+    write_hosts /etc/hosts fluorine
+    configure_plymouth
+    stage_grub_theme
+}
+
+write_os_release() {
     cat > /etc/os-release <<'EOF'
 PRETTY_NAME="FluorineOS 0.4.0 (Trixie)"
 NAME="FluorineOS"
@@ -21,17 +30,62 @@ EOF
 
     printf '%s\n' 'FluorineOS 0.4.0 \n \l' > /etc/issue
     chmod 0644 /etc/issue
+}
 
+write_hostname() {
     printf '%s\n' 'fluorine' > /etc/hostname
     chmod 0644 /etc/hostname
+}
 
+# Rewrite the local hostname lines of an existing hosts file without discarding
+# unrelated entries. The 127.0.1.1 line must match /etc/hostname or every sudo
+# invocation prints "unable to resolve host".
+#
+# The function is idempotent: the loopback block is regenerated in a fixed order
+# and every other mapping is preserved in place.
+write_hosts() {
+    local file=$1
+    local host=$2
+    local tmp
+
+    if ! tmp=$(mktemp -- "${file}.XXXXXX"); then
+        printf 'cannot create a temporary hosts file beside %s\n' "${file}" >&2
+        return 1
+    fi
+
+    if ! {
+        printf '%s\n' '# Written by the FluorineOS branding hook.'
+        printf '%s\n' '127.0.0.1	localhost'
+        printf '127.0.1.1\t%s\n' "${host}"
+        printf '%s\n' '::1	localhost ip6-localhost ip6-loopback'
+        if [ -f "${file}" ]; then
+            awk '
+                $1 != "127.0.0.1" &&
+                $1 != "127.0.1.1" &&
+                $1 != "::1" &&
+                $0 != "# Written by the FluorineOS branding hook." &&
+                $0 !~ /^[[:space:]]*$/ { print }
+            ' "${file}"
+        fi
+    } > "${tmp}"; then
+        rm -f -- "${tmp}"
+        return 1
+    fi
+
+    chmod 0644 "${tmp}"
+    mv -f -- "${tmp}" "${file}"
+}
+
+configure_plymouth() {
     if command -v plymouth-set-default-theme >/dev/null 2>&1 &&
         [ -d /usr/share/plymouth/themes/fluorine ]; then
         plymouth-set-default-theme -R fluorine
     else
         printf 'Plymouth theme fluorine not available, skipping\n' >&2
     fi
+}
 
+stage_grub_theme() {
     # GRUB can only read from the boot partition, so the packaged theme has to
     # be staged under /boot before the menu is generated.
     if [ -d /usr/share/grub/themes/fluorine ] && [ -d /boot/grub ]; then
