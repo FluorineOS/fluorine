@@ -1,0 +1,103 @@
+# FluorineOS hardware support: firmware, microcode, and the userspace pieces
+# each device class needs on Debian trixie.
+#
+# Every entry resolves to trixie or to trixie non-free-firmware. Nothing here
+# comes from a third-party repository, and no driver is built from source, so
+# the kernel stays the Debian kernel and upgrades stay ordinary APT upgrades.
+#
+# Packages are grouped by the subsystem that needs them, so a future change can
+# be reviewed against one device class at a time. The reasoning for every group
+# is in docs/HARDWARE.md.
+
+# Kernel, GPU, and Wi-Fi firmware.
+#
+# firmware-linux is a metapackage over firmware-linux-free and
+# firmware-linux-nonfree. In trixie that pulls only firmware-misc-nonfree and
+# firmware-amd-graphics, so every other GPU and radio family is named here.
+# Each of these packages backs a free in-kernel driver:
+#   firmware-intel-graphics   i915/xe GuC, HuC, and DMC blobs. Gen12 and later
+#                             need them for media decode and low-power states.
+#   firmware-intel-sound      Intel SST audio DSP blobs.
+#   firmware-sof-signed       Sound Open Firmware, the audio path on most Intel
+#                             laptops from Ice Lake onward. Without it the
+#                             internal speakers and microphone stay silent.
+#   firmware-nvidia-graphics  nouveau/GSP blobs. Turing and newer cards cannot
+#                             drive a display with nouveau without them.
+#   firmware-brcm80211        Broadcom/Cypress Wi-Fi and Bluetooth.
+#   firmware-mediatek         MediaTek MT76 Wi-Fi and Bluetooth, common on
+#                             budget AMD laptops.
+# firmware-qcom-soc is deliberately absent: it targets arm64 SoCs, and this
+# image is amd64 only.
+firmware-linux
+firmware-intel-graphics
+firmware-intel-sound
+firmware-sof-signed
+firmware-nvidia-graphics
+firmware-iwlwifi
+firmware-realtek
+firmware-atheros
+firmware-brcm80211
+firmware-mediatek
+
+# CPU microcode. The image is family-agnostic, so both blobs ship and the
+# initramfs loads the one that matches the running CPU.
+intel-microcode
+amd64-microcode
+
+# Wireless. The regulatory database is what lets the stack pick legal channels
+# and transmit power per country; without it a card comes up on the world
+# domain. wpasupplicant is NetworkManager's WPA backend, and iw plus rfkill are
+# the inspection tools flr-doctor and the troubleshooting docs rely on.
+wireless-regdb
+wpasupplicant
+iw
+rfkill
+
+# Video decode. Mesa's VA driver covers AMD and the free NVIDIA path, and the
+# Intel media driver covers Gen8 and newer; libva selects between them at
+# runtime. vainfo is the check that reports which profiles are actually usable.
+# i965-va-driver is not installed: it only matters for Intel graphics older
+# than Gen8, and docs/HARDWARE.md says how to add it.
+mesa-va-drivers
+intel-media-va-driver
+vainfo
+
+# Audio and capture. pipewire-alsa gives ALSA-only applications a path into
+# PipeWire instead of a dead device, and v4l-utils is the webcam control and
+# query tool set.
+pipewire-alsa
+v4l-utils
+
+# Storage. udisks2 is what Thunar's volume manager talks to for removable
+# media, and exfatprogs formats the exFAT sticks that ship pre-formatted.
+udisks2
+exfatprogs
+
+# Power. power-profiles-daemon backs flr-power and the Waybar power module, and
+# upower feeds the battery module. brightness-udev installs the udev rules that
+# let a session user change the panel and keyboard backlight without root.
+# TLP is deliberately not installed: it and power-profiles-daemon manage the
+# same platform profile and conflict.
+power-profiles-daemon
+upower
+brightness-udev
+
+# Hybrid graphics. D-Bus activated with no daemon at boot; it lets an
+# application ask which GPUs exist before choosing one.
+switcheroo-control
+
+# Wayland-native Qt. Without the platform plugin Qt applications fall back to
+# XWayland, which costs a full frame copy and ignores fractional scaling.
+qt6-wayland
+
+# Printing. CUPS is socket activated, and the PolicyKit helper is what the GTK
+# printer dialogs authenticate through. avahi-daemon and libnss-mdns make
+# network printers discoverable and resolve the .local names they advertise.
+cups
+cups-pk-helper
+avahi-daemon
+libnss-mdns
+
+# Accessibility. Orca is Debian's screen reader; it reads GTK and Qt
+# applications over AT-SPI, which the GTK stack already provides.
+orca
