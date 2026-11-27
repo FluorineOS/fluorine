@@ -7,6 +7,16 @@ set -euo pipefail
 
 version="${FLUORINE_VERSION:-$(<VERSION)}"
 
+# Secure Boot is deliberately not enabled for the live medium.
+#
+# --uefi-secure-boot would put Debian's shim on the ISO, so the medium would
+# boot on a Secure Boot machine while the installed system cannot: the installer
+# writes an unsigned grubx64.efi, which firmware with Secure Boot enabled
+# refuses. That combination is the worst possible failure shape, because every
+# step up to the first reboot appears to succeed. Without the flag the ISO and
+# the installed system make the same claim, and firmware refuses the medium
+# instead of refusing the installed disk. See docs/INSTALLER.md.
+
 if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     printf 'Invalid FluorineOS version: %s\n' "${version}" >&2
     exit 1
@@ -24,7 +34,6 @@ lb config noauto \
   --parent-archive-areas "main contrib non-free non-free-firmware" \
   --debian-installer none \
   --bootloaders "grub-efi" \
-  --uefi-secure-boot enable \
   --iso-application "FluorineOS ${version}" \
   --iso-publisher "FluorineOS; https://github.com/FluorineOS" \
   --iso-volume "${volume}" \
