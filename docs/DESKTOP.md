@@ -81,6 +81,40 @@ type in trixie's `shared-mime-info` rather than an alias some application lists:
 `audio/opus`, `image/jpg`, and `video/mkv` are aliases and are not mapped for
 that reason.
 
+## First login
+
+The first session differs between the live medium and the installed system, and
+`flr-onboard` decides which one to show from `/run/live`, the same marker the
+greetd drop-in and the live session profile already use.
+
+- **Live medium.** One notification, once per boot: `SUPER + Escape` opens the
+  system menu, where **Install FluorineOS** starts the installer, and `SUPER + /`
+  lists every keybinding. The marker lives in the live user's home, which the
+  next boot recreates, so the card returns on the next live boot and never
+  appears on an installed system. The keybind cheat sheet is deliberately not
+  shown here: the live session has one job, and a wall of binds delays it.
+- **Installed system.** The first login opens the keybind cheat sheet once, then
+  writes `~/.local/state/fluorine/onboarded`.
+
+The installer has no desktop icon. Hyprland draws no desktop, so
+`/etc/skel/Desktop/install-fluorineos.desktop` is only reachable by opening the
+file manager, and Fuzzel lists `/usr/share/applications` rather than home
+directories. The working path is the system menu: `flr-ctl` gates its installer
+entry on `/run/live` and runs `sudo /usr/bin/calamares` under the live sudoers
+grant. The `calamares` package also ships
+`/usr/share/applications/calamares.desktop` ("Install System",
+`sh -c "pkexec calamares"`), and the image ships no polkit rule for that action,
+so the sanctioned entry is the one in the system menu. `installer-cleanup`
+removes the shortcut and the installer itself from the installed system.
+
+Nothing on this path needs the network, an account, or a telemetry call. Help
+after the first login is in the system menu as well: **Keybinding Cheatsheet**
+(`SUPER + /`), **Settings** (`SUPER + ,`), and **System Diagnostics**
+(`flr-doctor`), which reports package state, disk space and snapshot availability
+without privileges. The cheat sheet prints what each bind does ("close this
+window", "run kitty") rather than Hyprland's dispatcher name, and still lists a
+bind it does not recognise.
+
 ## Verification
 
 | Check | Command | Expected |
