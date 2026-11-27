@@ -229,6 +229,40 @@ create_or_repair() {
     log "created and verified the Snapper root configuration"
 }
 
+# The snapper package enables three timers. Two of them only exist for the
+# snapshot sources this configuration turns off, and one of those creates a
+# snapshot of / at every single boot:
+#
+#   snapper-boot.timer      runs `snapper create` for root on boot, so the
+#                           snapshot limit of fifty fills up with boot entries
+#                           that no rollback target needs.
+#   snapper-timeline.timer  fires hourly; normalize_config sets
+#                           TIMELINE_CREATE="no", so every run finds nothing to
+#                           do.
+#   snapper-cleanup.timer   kept. NUMBER_CLEANUP="yes" in the template is what
+#                           prunes the pre-update snapshots flr-update creates.
+#
+# systemctl --root edits the enablement symlinks offline, which is the only way
+# to do it inside an install chroot where no systemd is running. The timers are
+# disabled rather than masked: masking would also block a later
+# `systemctl start`, which is the documented way to re-enable boot snapshots.
+disable_unused_timers() {
+    local unit
+
+    if ! command -v systemctl >/dev/null 2>&1; then
+        log "systemctl is not available; the snapper timers are left as packaged"
+        return 0
+    fi
+
+    for unit in snapper-boot.timer snapper-timeline.timer; do
+        if systemctl --root="${root_prefix:-/}" disable --quiet "${unit}" >/dev/null 2>&1; then
+            log "disabled ${unit}: nothing would create a snapshot on that schedule"
+        else
+            log "WARNING: could not disable ${unit}; it stays enabled"
+        fi
+    done
+}
+
 main() {
     local fstype=""
 
@@ -252,6 +286,7 @@ main() {
 
     ensure_snapshots_dir
     create_or_repair
+    disable_unused_timers
     log "Snapper root configuration is ready"
 }
 
