@@ -142,72 +142,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          iso="FluorineOS-${VERSION}-amd64.iso"
-          workdir="$(mktemp -d)"
-          log="${workdir}/uefi-boot.log"
-
-          code=""
-          for candidate in /usr/share/OVMF/OVMF_CODE_4M.fd /usr/share/OVMF/OVMF_CODE.fd /usr/share/ovmf/OVMF.fd; do
-            if [ -f "${candidate}" ]; then
-              code="${candidate}"
-              break
-            fi
-          done
-
-          if [ -z "${code}" ]; then
-            printf 'OVMF firmware is not installed.\n' >&2
-            exit 1
-          fi
-
-          vars_source=""
-          for candidate in /usr/share/OVMF/OVMF_VARS_4M.fd /usr/share/OVMF/OVMF_VARS.fd; do
-            if [ -f "${candidate}" ]; then
-              vars_source="${candidate}"
-              break
-            fi
-          done
-
-          accel=(-accel tcg)
-          if [ -w /dev/kvm ]; then
-            accel=(-accel kvm -cpu host)
-          else
-            printf '::warning::Hardware acceleration is unavailable; the firmware boot check runs under TCG.\n'
-          fi
-
-          cp -- "${code}" "${workdir}/code.fd"
-          chmod 0644 "${workdir}/code.fd"
-          if [ -n "${vars_source}" ]; then
-            cp -- "${vars_source}" "${workdir}/vars.fd"
-            chmod 0644 "${workdir}/vars.fd"
-          else
-            : > "${workdir}/vars.fd"
-            truncate -s 540672 "${workdir}/vars.fd"
-          fi
-
-          timeout 60 qemu-system-x86_64 \
-            -machine q35 \
-            "${accel[@]}" \
-            -m 2048 -smp 2 \
-            -drive if=pflash,format=raw,readonly=on,file="${workdir}/code.fd" \
-            -drive if=pflash,format=raw,file="${workdir}/vars.fd" \
-            -device virtio-vga -display none \
-            -drive file="${iso}",media=cdrom,readonly=on -boot d \
-            -serial "file:${log}" -no-reboot || true
-
-          if ! grep -qiE 'BdsDxe: starting Boot[0-9]+' "${log}"; then
-            printf 'The firmware did not start a boot entry from the ISO.\n' >&2
-            tail -40 "${log}" >&2 || true
-            exit 1
-          fi
-
-          if grep -qiE 'Boot Failed|No bootable option|Failed to load image' "${log}"; then
-            printf 'The firmware reported a failed boot attempt.\n' >&2
-            tail -40 "${log}" >&2
-            exit 1
-          fi
-
-          printf 'UEFI firmware started the ISO boot entry.\n'
-          grep -aiE 'BdsDxe: starting Boot[0-9]+' "${log}"
+          bash scripts/qemu-boot-gate.sh \
+            --mode firmware \
+            --iso "FluorineOS-${VERSION}-amd64.iso" \
+            --sha256-file "FluorineOS-${VERSION}-amd64.iso.sha256" \
+            --evidence-dir "${RUNNER_TEMP}/fluorine-boot-gate/firmware" \
+            --timeout 60 \
+            --memory 2048 \
+            --cpus 2 \
+            --accel auto
 
       - name: Verify the live system boots headless
         env:
@@ -215,93 +158,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          iso="FluorineOS-${VERSION}-amd64.iso"
-          workdir="$(mktemp -d)"
-          log="${workdir}/live-boot.log"
-          mountpoint="${workdir}/iso"
-
-          mkdir -p "${mountpoint}"
-          sudo mount -o loop,ro "${iso}" "${mountpoint}"
-          cp -- "${mountpoint}"/live/vmlinuz-* "${workdir}/vmlinuz"
-          cp -- "${mountpoint}"/live/initrd.img-* "${workdir}/initrd"
-          sudo umount "${mountpoint}"
-
-          accel=(-accel tcg)
-          if [ -w /dev/kvm ]; then
-            accel=(-accel kvm -cpu host)
-          else
-            printf '::warning::Hardware acceleration is unavailable; the boot check runs under TCG and may need the full timeout.\n'
-          fi
-
-          qemu-system-x86_64 \
-            -machine q35 \
-            "${accel[@]}" \
-            -m 2048 -smp 2 \
-            -kernel "${workdir}/vmlinuz" \
-            -initrd "${workdir}/initrd" \
-            -append "boot=live components console=ttyS0,115200 systemd.journald.forward_to_console=1 systemd.setenv=WLR_RENDERER_ALLOW_SOFTWARE=1" \
-            -device virtio-vga -display none \
-            -drive file="${iso}",media=cdrom,readonly=on \
-            -serial "file:${log}" -no-reboot &
-          qemu_pid=$!
-
-          cleanup() {
-            kill "${qemu_pid}" 2>/dev/null || true
-            wait "${qemu_pid}" 2>/dev/null || true
-          }
-          trap cleanup EXIT
-
-          deadline=$((SECONDS + 90))
-          while [ "${SECONDS}" -lt "${deadline}" ]; do
-            if grep -qE 'Reached target graphical.target' "${log}" 2>/dev/null; then
-              break
-            fi
-            sleep 3
-          done
-
-          printf 'Boot log after %s seconds (%s bytes):\n' "${SECONDS}" "$(stat -c %s "${log}" 2>/dev/null || printf 0)"
-
-          failed=0
-
-          require() {
-            local pattern="${1}"
-            local description="${2}"
-            if grep -aqE "${pattern}" "${log}"; then
-              printf 'found: %s\n' "${description}"
-            else
-              printf 'missing: %s\n' "${description}" >&2
-              failed=1
-            fi
-          }
-
-          forbid() {
-            local pattern="${1}"
-            local description="${2}"
-            if grep -aqE "${pattern}" "${log}"; then
-              printf 'unexpected: %s\n' "${description}" >&2
-              failed=1
-            else
-              printf 'absent: %s\n' "${description}"
-            fi
-          }
-
-          require 'Linux version [0-9]' 'kernel banner'
-          require 'squashfs: version' 'squashfs filesystem'
-          require 'Reached target multi-user.target' 'multi-user target'
-          require 'Reached target graphical.target' 'graphical target'
-
-          forbid 'Kernel panic' 'kernel panic'
-          forbid 'SQUASHFS error' 'squashfs error'
-          forbid 'Unable to find a medium containing a live file system' 'missing live medium'
-          forbid 'Failed to mount' 'failed mount'
-
-          if [ "${failed}" -ne 0 ]; then
-            printf '\nThe live system did not reach a clean graphical session.\n' >&2
-            tail -60 "${log}" >&2 || true
-            exit 1
-          fi
-
-          printf 'Live system reached graphical.target without boot errors.\n'
+          bash scripts/qemu-boot-gate.sh \
+            --mode live \
+            --iso "FluorineOS-${VERSION}-amd64.iso" \
+            --sha256-file "FluorineOS-${VERSION}-amd64.iso.sha256" \
+            --evidence-dir "${RUNNER_TEMP}/fluorine-boot-gate/live" \
+            --timeout 90 \
+            --memory 2048 \
+            --cpus 2 \
+            --accel auto
 
       - name: Upload the ISO as a workflow artifact
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}

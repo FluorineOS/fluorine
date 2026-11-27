@@ -3,37 +3,62 @@ set -euo pipefail
 
 # Boot the FluorineOS live image in QEMU with UEFI firmware.
 #
-# Usage: scripts/run-qemu-live.sh [--export-win]
-#
-#   --export-win  Copy the ISO into the Windows user's Downloads folder before
-#                 booting. Only meaningful when the image is built under WSL2.
+# Usage: scripts/run-qemu-live.sh [options]
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(dirname -- "${SCRIPT_DIR}")
-WINDOWS_ISO_NAME="FluorineOS-0.4.0-amd64.iso"
+# shellcheck source-path=SCRIPTDIR
+# shellcheck source=lib/qemu-common.sh
+source "${SCRIPT_DIR}/lib/qemu-common.sh"
+# shellcheck source-path=SCRIPTDIR
+# shellcheck source=lib/qemu-manifest.sh
+source "${SCRIPT_DIR}/lib/qemu-manifest.sh"
+
 MEMORY=4096
 CPUS=4
-SERIAL_SOCKET="${TMPDIR:-/tmp}/fluorineos-serial.sock"
 
 EXPORT_WIN=0
+DRY_RUN=0
+REQUIRE_KVM=0
+ISO_FROM_CLI=0
+ISO_FROM_ENV=0
+ORIGINAL_ARGS=()
+ISO_REQUESTED="${FLUORINEOS_ISO:-}"
+CHECKSUM_REQUESTED="${FLUORINEOS_ISO_SHA256_FILE:-}"
+EVIDENCE_REQUESTED="${FLUORINEOS_EVIDENCE_DIR:-}"
+SERIAL_SOCKET_REQUESTED="${FLUORINEOS_SERIAL_SOCKET:-}"
+VNC_DISPLAY="${FLUORINEOS_VNC:-}"
 VARS_COPY=""
-FIRMWARE_ARGS=()
+
+if [ -n "${FLUORINEOS_ISO:-}" ]; then
+    ISO_FROM_ENV=1
+fi
 
 usage() {
     cat <<'EOF'
-Usage: scripts/run-qemu-live.sh [--export-win]
+Usage: scripts/run-qemu-live.sh [options]
 
 Boots the FluorineOS live ISO in QEMU with UEFI firmware.
 
 Options:
-  --export-win   Copy the ISO to the Windows Downloads folder first.
-  -h, --help     Show this help.
-EOF
-}
+  --iso PATH              Use this ISO. Overrides FLUORINEOS_ISO and discovery.
+  --sha256-file PATH      Verify the ISO with this sha256sum file.
+  --evidence-dir DIR      Evidence directory. Must be outside the repository.
+  --serial-socket PATH    Also expose serial traffic on a Unix socket.
+  --dry-run               Validate and print the plan; create nothing.
+  --require-kvm           Fail unless KVM is available.
+  --export-win            Copy the selected ISO to Windows Downloads first.
+  -h, --help              Show this help.
 
-die() {
-    printf 'error: %s\n' "$*" >&2
-    exit 1
+Environment:
+  FLUORINEOS_ISO, FLUORINEOS_ISO_SHA256_FILE, FLUORINEOS_EVIDENCE_DIR,
+  FLUORINEOS_SERIAL_SOCKET, FLUORINEOS_VNC
+
+Without --iso, the launcher reads VERSION and accepts only one matching
+live-build output, including the doubled-architecture .hybrid.iso name.
+The serial log is written to <evidence>/serial.log. A JSON manifest is written
+to <evidence>/manifest.json for every non-dry run.
+EOF
 }
 
 cleanup() {
@@ -42,138 +67,193 @@ cleanup() {
     fi
 }
 
-trap cleanup EXIT
+on_exit() {
+    local status=$?
 
-is_wsl() {
-    grep -qi microsoft /proc/version 2>/dev/null
+    trap - EXIT INT TERM
+    if [ "${FLR_MANIFEST_ACTIVE:-0}" -eq 1 ]; then
+        flr_manifest_finalize "${status}" || true
+    fi
+    cleanup
+    exit "${status}"
 }
 
-find_iso() {
-    local candidate
-
-    for candidate in \
-        "${REPO_ROOT}/FluorineOS-0.4.0-amd64.iso" \
-        "${REPO_ROOT}/FluorineOS-0.4.0-amd64.hybrid.iso" \
-        "${REPO_ROOT}/live-image-amd64.hybrid.iso"; do
-        if [ -f "${candidate}" ]; then
-            printf '%s\n' "${candidate}"
-            return 0
-        fi
-    done
-    return 1
-}
-
-require_qemu() {
-    command -v qemu-system-x86_64 >/dev/null 2>&1 ||
-        die "qemu-system-x86_64 not found; install qemu-system-x86"
-}
+trap on_exit EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 export_to_windows() {
     local iso=$1
+    local name=""
     local cmd="/mnt/c/Windows/System32/cmd.exe"
-    local profile
-    local downloads
+    local profile=""
+    local downloads=""
 
-    [ -x "${cmd}" ] || die "cmd.exe not found; --export-win requires WSL2"
-    command -v wslpath >/dev/null 2>&1 || die "wslpath not found; --export-win requires WSL2"
+    [ -x "${cmd}" ] || flr_die "cmd.exe not found; --export-win requires WSL2"
+    command -v wslpath >/dev/null 2>&1 ||
+        flr_die "wslpath not found; --export-win requires WSL2"
 
     profile=$("${cmd}" /c "echo %USERPROFILE%" 2>/dev/null | tr -d '\r')
-    [ -n "${profile}" ] || die "could not resolve the Windows user profile"
+    [ -n "${profile}" ] || flr_die "could not resolve the Windows user profile"
 
+    name=$(basename -- "${iso}")
     downloads=$(wslpath -u "${profile}")/Downloads
     mkdir -p -- "${downloads}"
-    cp -- "${iso}" "${downloads}/${WINDOWS_ISO_NAME}"
-    printf 'Exported ISO to %s\n' "${downloads}/${WINDOWS_ISO_NAME}"
-    if [ -f "${iso}.sha256" ]; then
-        cp -- "${iso}.sha256" "${downloads}/${WINDOWS_ISO_NAME}.sha256"
-        printf 'Exported checksum to %s\n' "${downloads}/${WINDOWS_ISO_NAME}.sha256"
-    fi
-}
-
-build_firmware_args() {
-    if [ -f /usr/share/OVMF/OVMF_CODE_4M.fd ] && [ -f /usr/share/OVMF/OVMF_VARS_4M.fd ]; then
-        VARS_COPY=$(mktemp --suffix=-OVMF_VARS.fd)
-        cp -- /usr/share/OVMF/OVMF_VARS_4M.fd "${VARS_COPY}"
-        FIRMWARE_ARGS=(
-            -drive "if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd"
-            -drive "if=pflash,format=raw,file=${VARS_COPY}"
-        )
-    elif [ -f /usr/share/ovmf/OVMF.fd ]; then
-        FIRMWARE_ARGS=(-bios /usr/share/ovmf/OVMF.fd)
-    else
-        die "no UEFI firmware found; install ovmf"
-    fi
+    cp -- "${iso}" "${downloads}/${name}"
+    printf '%s  %s\n' "${FLR_ISO_SHA256}" "${name}" > "${downloads}/${name}.sha256"
+    printf 'Exported ISO to %s\n' "${downloads}/${name}"
+    printf 'Exported checksum to %s\n' "${downloads}/${name}.sha256"
 }
 
 main() {
-    local iso
-    local accel_args
-    local gpu_args
+    local iso_version=""
+    local options_json=""
+    local qemu_status=0
 
+    ORIGINAL_ARGS=("$@")
     while [ "$#" -gt 0 ]; do
         case "$1" in
+            --iso)
+                [ "$#" -ge 2 ] || flr_die "option --iso requires an argument"
+                ISO_REQUESTED=$2
+                ISO_FROM_CLI=1
+                shift 2
+                ;;
+            --sha256-file)
+                [ "$#" -ge 2 ] || flr_die "option --sha256-file requires an argument"
+                CHECKSUM_REQUESTED=$2
+                shift 2
+                ;;
+            --evidence-dir)
+                [ "$#" -ge 2 ] || flr_die "option --evidence-dir requires an argument"
+                EVIDENCE_REQUESTED=$2
+                shift 2
+                ;;
+            --serial-socket)
+                [ "$#" -ge 2 ] || flr_die "option --serial-socket requires an argument"
+                SERIAL_SOCKET_REQUESTED=$2
+                shift 2
+                ;;
+            --dry-run)
+                DRY_RUN=1
+                shift
+                ;;
+            --require-kvm)
+                REQUIRE_KVM=1
+                shift
+                ;;
             --export-win)
                 EXPORT_WIN=1
+                shift
                 ;;
             -h | --help)
                 usage
                 exit 0
                 ;;
+            --)
+                shift
+                [ "$#" -eq 0 ] || flr_die "unexpected positional argument: $1"
+                break
+                ;;
             *)
                 usage >&2
-                die "unknown option: $1"
+                flr_die "unknown option: $1"
                 ;;
         esac
-        shift
     done
 
-    require_qemu
-    iso=$(find_iso) || die "no ISO found in ${REPO_ROOT}; build the image first"
+    flr_require_cmd qemu-system-x86_64
+    flr_require_cmd sha256sum
+    flr_require_cmd realpath
+    flr_require_cmd stat
+
+    if [ -z "${ISO_REQUESTED}" ]; then
+        iso_version=$(flr_detect_version) ||
+            flr_die "cannot derive the ISO version from ${REPO_ROOT}/VERSION; use --iso PATH or FLUORINEOS_ISO"
+        ISO_REQUESTED=$(flr_find_iso "${iso_version}")
+    elif [ -n "${FLUORINEOS_ISO:-}" ] && [ "${ISO_REQUESTED}" != "${FLUORINEOS_ISO}" ]; then
+        printf 'ISO selection: --iso overrides FLUORINEOS_ISO\n'
+    fi
+
+    if [ "${ISO_FROM_CLI}" -eq 1 ]; then
+        FLR_ISO_SOURCE="explicit"
+    elif [ "${ISO_FROM_ENV}" -eq 1 ]; then
+        FLR_ISO_SOURCE="environment"
+    else
+        FLR_ISO_SOURCE="discovered"
+    fi
+
+    flr_resolve_iso "${ISO_REQUESTED}"
+    flr_resolve_checksum "${CHECKSUM_REQUESTED}"
+    flr_verify_iso
+
+    if [ -z "${EVIDENCE_REQUESTED}" ]; then
+        EVIDENCE_REQUESTED=$(flr_default_evidence_dir)
+    fi
+    flr_resolve_evidence_dir "${EVIDENCE_REQUESTED}"
+    if [ -n "${SERIAL_SOCKET_REQUESTED}" ]; then
+        flr_validate_socket_path "${SERIAL_SOCKET_REQUESTED}"
+    fi
+    flr_build_serial_args "${FLR_SERIAL_SOCKET}"
+
+    flr_detect_environment
+    if [ "${REQUIRE_KVM}" -eq 1 ]; then
+        flr_require_kvm
+    fi
+    flr_build_gpu_args "${VNC_DISPLAY}"
+
+    flr_print_environment
+
+    if [ "${DRY_RUN}" -eq 1 ]; then
+        printf 'Dry run: no evidence directory, firmware copy, export, manifest, or QEMU process was created.\n'
+        return 0
+    fi
+
+    flr_require_cmd jq
+    mkdir -p -- "${FLR_EVIDENCE_DIR}"
+    options_json=$(flr_manifest_sanitize_args "${ORIGINAL_ARGS[@]}") ||
+        flr_die "cannot sanitize command-line options"
+    flr_manifest_init "run-qemu-live.sh" "${MEMORY}" "${CPUS}" "${options_json}" \
+        preflight version qemu boot shutdown
+    flr_manifest_stage preflight PASS \
+        "ISO verified; checksum status ${FLR_CHECKSUM_STATUS}; acceleration ${FLR_ACCEL}"
+    printf 'Manifest: %s\n' "${FLR_MANIFEST_PATH}"
+
+    flr_write_artifact_record
+    flr_write_environment_record "${MEMORY}" "${CPUS}"
 
     if [ "${EXPORT_WIN}" -eq 1 ]; then
-        export_to_windows "${iso}"
+        export_to_windows "${FLR_ISO_PATH}"
     fi
 
-    if [ -w /dev/kvm ]; then
-        accel_args=(-enable-kvm -cpu host)
-        printf 'Acceleration: KVM\n'
-    else
-        accel_args=(-accel tcg)
-        printf 'Acceleration: TCG (software emulation)\n'
-    fi
+    VARS_COPY=$(mktemp --suffix=-OVMF_VARS.fd)
+    flr_prepare_firmware "${VARS_COPY}" 1
 
-    if [ -n "${FLUORINEOS_VNC:-}" ]; then
-        # Headless viewing path. QEMU serves the framebuffer on
-        # 127.0.2.0:5900+N; bridge it to a browser with
-        # websockify 6080 127.0.2.0:5900+N and /usr/share/novnc.
-        gpu_args=(-vga none -device virtio-vga -display none -vnc "127.0.2.0:${FLUORINEOS_VNC}")
-        printf 'Display: virtio-vga over VNC 127.0.2.0:590%s\n' "${FLUORINEOS_VNC}"
-    elif is_wsl; then
-        # WSLg's D3D12 Mesa path crashes with gl=on, so stay on the 2D device.
-        gpu_args=(-vga none -device virtio-vga -display gtk)
-        printf 'Display: virtio-vga without 3D acceleration (WSL2)\n'
-    else
-        gpu_args=(-vga none -device virtio-vga-gl -display "gtk,gl=on")
-        printf 'Display: virtio-vga-gl with 3D acceleration\n'
-    fi
+    printf 'Booting %s\n' "${FLR_ISO_PATH}"
+    printf 'Serial log: %s\n' "${FLR_SERIAL_LOG}"
 
-    build_firmware_args
-
-    printf 'Booting %s\n' "${iso}"
-
+    flr_manifest_stage qemu RUNNING "QEMU is starting"
     qemu-system-x86_64 \
         -machine q35 \
-        "${accel_args[@]}" \
+        "${FLR_ACCEL_ARGS[@]}" \
         -m "${MEMORY}" \
         -smp "${CPUS}" \
-        "${FIRMWARE_ARGS[@]}" \
-        "${gpu_args[@]}" \
-        -cdrom "${iso}" \
+        "${FLR_FIRMWARE_ARGS[@]}" \
+        "${FLR_GPU_ARGS[@]}" \
+        -cdrom "${FLR_ISO_PATH}" \
         -boot d \
         -netdev user,id=net0 \
         -device virtio-net-pci,netdev=net0 \
-        -chardev "socket,id=flrserial,path=${SERIAL_SOCKET},server=on,wait=off" \
-        -serial chardev:flrserial
+        "${FLR_SERIAL_ARGS[@]}" || qemu_status=$?
+
+    if [ "${qemu_status}" -eq 0 ]; then
+        flr_manifest_stage qemu PASS \
+            "QEMU exited with status 0; boot evidence must be recorded separately"
+    else
+        flr_manifest_stage qemu FAIL "QEMU exited with status ${qemu_status}"
+        printf 'QEMU exited with status %s\n' "${qemu_status}" >&2
+        exit "${qemu_status}"
+    fi
 }
 
 main "$@"
