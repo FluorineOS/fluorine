@@ -155,7 +155,9 @@ else
 fi
 
 # Services the hardware support depends on are enabled by the services hook.
-for unit in power-profiles-daemon.service cups.service avahi-daemon.service; do
+# Printing is listed by its socket: the daemon itself is deliberately started
+# on demand, not at boot (see docs/PERFORMANCE.md).
+for unit in power-profiles-daemon.service cups.socket avahi-daemon.service; do
     if grep -q -- "enable_unit ${unit}" "${SERVICES}" 2>/dev/null; then
         ok "hook enables ${unit}"
     else
