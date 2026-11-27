@@ -36,6 +36,13 @@ main() {
     if command -v ufw >/dev/null 2>&1; then
         ufw default deny incoming
         ufw default allow outgoing
+
+        # avahi-daemon needs inbound multicast DNS, and without it driverless
+        # printer discovery silently finds nothing: avahi answers on 5353/udp
+        # and the reply is an inbound packet the default deny rule drops. The
+        # avahi package ships no ufw application profile, so the port is named
+        # directly. This is the only inbound port the image opens.
+        ufw allow 5353/udp comment 'mDNS service discovery'
         # Enabling inside the chroot only records the policy; the service
         # starts on first boot.
         ufw --force enable || printf 'ufw: enable deferred to first boot\n' >&2
